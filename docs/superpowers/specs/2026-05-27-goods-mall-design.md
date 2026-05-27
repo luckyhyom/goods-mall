@@ -1,21 +1,33 @@
-# goods-mall 설계 문서
+# goods-mall 설계 문서 (Foundation Roadmap)
 
 > 애니메이션 캐릭터 굿즈 쇼핑몰 (포트폴리오/학습용)
 > 작성: 2026-05-27
-> 상태: **작성 중** — 진행하면서 섹션 추가
+> 상태: **Foundation Roadmap** — 큰 방향만 정하고, 슬라이스별 상세는 구현 시점에 결정·보완
 
 ---
 
-## 작성 진척
+## 진행 철학
+
+이 문서는 "완성된 설계"가 아니라 **진화적 로드맵**입니다.
+
+- §1~§4는 **모든 슬라이스에 적용되는 공통 토대**를 정의 (변경 시 영향 큼)
+- §5 이후 항목은 **슬라이스 시작 시점에 그 슬라이스 기준으로 결정**
+- 슬라이스 진행 중 발견한 보완점은 해당 슬라이스 문서 또는 이 문서에 회고로 반영
+
+**최소 모듈 단위로 진행**하며, 각 슬라이스는:
+1. 슬라이스 시작 전 별도 plan 문서 작성 (`docs/superpowers/specs/<n>-<slice>-plan.md`)
+2. 구현
+3. 회고에서 Foundation 갱신 필요 여부 확인
+
+---
+
+## 작성 진척 (Foundation 부분)
 
 - [x] §1 전체 스택과 폴더 구조
-- [x] §2 데이터베이스 스키마
-- [x] §3 인증 전략
-- [ ] §4 API 아키텍처 (Clean Architecture 상세)
-- [ ] §5 프런트엔드 구조
-- [ ] §6 에러 처리 및 검증
-- [ ] §7 테스트 전략
-- [ ] §8 슬라이스별 상세 범위
+- [x] §2 데이터베이스 스키마 (전체 ERD — 슬라이스 진행 중 일부 모델만 마이그레이션)
+- [x] §3 인증 전략 (Slice 1에서 적용)
+- [x] §4 API 아키텍처 (Slice별로 단순 계층 / Clean Architecture 적용)
+- [ ] §5~ 슬라이스별 plan으로 분리 — 슬라이스 시작 시점에 작성
 
 관련 문서:
 - [DDD 적용 규칙](../../architecture/ddd-rules.md) — 모든 슬라이스에 적용
@@ -788,22 +800,213 @@ useEffect(() => {
 
 세션 + 단순 별도 계정 방식 대비 약 3일 추가. 학습 가치(JWT/OAuth 실전 패턴 + 모바일 호환)로 정당화됨.
 
-## §4 API 아키텍처 (작성 예정)
+## §4 API 아키텍처
 
-_다음 세션에서 작성_
+### §4.1 모듈별 아키텍처 매핑
 
-## §5 프런트엔드 구조 (작성 예정)
+| 모듈 | 아키텍처 | 이유 |
+|------|---------|------|
+| `auth` | 단순 계층 | 표준화된 인증 로직, 도메인 가치 낮음 |
+| `user` | 단순 계층 | CRUD 위주 |
+| `address` | 단순 계층 | CRUD + 기본 주소 규칙만 |
+| `product` | 단순 계층 | CRUD 위주 |
+| `cart` | **Clean Architecture (4계층) + DDD** | 불변식 다수 (중복, 수량, 재고) |
+| `order` | **Clean Architecture (4계층) + DDD** | 상태 전이, 결제, 재고 차감, 스냅샷 |
 
-_다음 세션에서 작성_
+### §4.2 단순 계층 패턴
 
-## §6 에러 처리 및 검증 (작성 예정)
+```
+src/modules/<name>/
+├── <name>.controller.ts        # @Controller
+├── <name>.service.ts           # 비즈니스 로직 + Prisma 직접 호출
+├── <name>.module.ts
+└── dto/
+```
 
-_다음 세션에서 작성_
+`Controller → Service → Prisma`. 도메인 클래스 없음.
 
-## §7 테스트 전략 (작성 예정)
+### §4.3 Clean Architecture 패턴 (cart, order)
 
-_다음 세션에서 작성_
+폴더 구조와 책임은 [DDD 적용 규칙 §2](../../architecture/ddd-rules.md#2-폴더-구조-aggregate-모듈) 참고.
 
-## §8 슬라이스별 상세 범위 (작성 예정)
+요약:
+- `domain/` — AggregateRoot, Entity, ValueObject, Repository 인터페이스, Domain Event
+- `application/` — Command/Query/Handler, EventHandler, use-case DTO
+- `infrastructure/` — Prisma Repository 구현, Mapper
+- `presentation/` — Controller, Request/Response DTO
 
-_다음 세션에서 작성_
+### §4.4 Aggregate Root 패턴 (cart 예)
+
+```ts
+// domain/cart.aggregate.ts
+export class Cart extends AggregateRoot {
+  private constructor(
+    public readonly userId: string,
+    private _items: CartItem[],
+  ) { super(); }
+
+  static reconstitute(userId: string, items: CartItem[]) {
+    return new Cart(userId, items);
+  }
+
+  static empty(userId: string) {
+    return new Cart(userId, []);
+  }
+
+  addItem(productId: string, quantity: number): void {
+    // 불변식 검증 + 이벤트 발행
+    this.apply(new CartItemAddedEvent(this.userId, productId, quantity));
+  }
+
+  // ... removeItem, changeQuantity, clear
+}
+```
+
+### §4.5 Repository 패턴 (인터페이스 + 구현체)
+
+```ts
+// domain/cart.repository.ts (인터페이스)
+export abstract class CartRepository {
+  abstract findByUserId(userId: string): Promise<Cart>;
+  abstract save(cart: Cart): Promise<void>;
+}
+
+// infrastructure/cart.prisma.repository.ts (구현)
+@Injectable()
+export class CartPrismaRepository implements CartRepository {
+  async findByUserId(userId: string): Promise<Cart> {
+    const rows = await this.prisma.cartItem.findMany({ where: { userId } });
+    return CartMapper.toDomain(userId, rows);
+  }
+
+  async save(cart: Cart): Promise<void> {
+    // 단순 "전체 교체" 전략 (MVP)
+    await this.prisma.$transaction(async (tx) => {
+      await tx.cartItem.deleteMany({ where: { userId: cart.userId } });
+      const rows = CartMapper.toPersistence(cart);
+      if (rows.length > 0) await tx.cartItem.createMany({ data: rows });
+    });
+  }
+}
+
+// 모듈에서 바인딩
+{ provide: CartRepository, useClass: CartPrismaRepository }
+```
+
+### §4.6 Command / Query 분리
+
+**Command (쓰기)** — Aggregate 통과 강제:
+
+```ts
+@CommandHandler(AddItemCommand)
+export class AddItemHandler {
+  async execute(cmd: AddItemCommand) {
+    const cart = await this.cartRepo.findByUserId(cmd.userId);
+    cart.addItem(cmd.productId, cmd.quantity);
+    await this.cartRepo.save(cart);
+    cart.commit();  // 이벤트 발행
+  }
+}
+```
+
+**Query (읽기)** — 도메인 우회 허용 (CQRS Query side):
+
+```ts
+@QueryHandler(GetCartQuery)
+export class GetCartHandler {
+  async execute(q: GetCartQuery) {
+    // Prisma 직접 호출 → 화면용 DTO 반환
+    const items = await this.prisma.cartItem.findMany({
+      where: { userId: q.userId },
+      include: { product: true },
+    });
+    return { items: items.map(toDto), totalWon: sum(items) };
+  }
+}
+```
+
+### §4.7 모듈 간 통신 — Domain Event
+
+다른 Aggregate에 부수효과를 일으킬 때는 직접 호출하지 말고 이벤트로:
+
+```ts
+// order/domain/events/order-placed.event.ts
+export class OrderPlacedEvent {
+  constructor(public orderId: string, public items: {...}[]) {}
+}
+
+// product 모듈에서 구독 (재고 차감)
+@EventsHandler(OrderPlacedEvent)
+export class DecrementStockHandler implements IEventHandler<OrderPlacedEvent> {
+  async handle(event: OrderPlacedEvent) {
+    await this.prisma.$transaction(/* 재고 차감 */);
+  }
+}
+```
+
+**이점:**
+- order 모듈은 product 모듈을 모름
+- 새 부수효과 추가 시 핸들러만 추가
+- 향후 메시지 브로커로 이전 쉬움
+
+### §4.8 트랜잭션 경계 (DDD 규칙 §1.4)
+
+- 한 트랜잭션에서 **하나의 Aggregate**만 변경
+- 여러 Aggregate를 변경해야 하면 Domain Event로 비동기
+- 트레이드오프: eventual consistency (재고 차감이 0.01초 뒤 일어남)
+- 강한 일관성 필요 시 Saga 패턴 도입 (MVP 범위 외)
+
+### §4.9 NestJS CQRS 설정
+
+```ts
+@Module({
+  imports: [CqrsModule.forRoot(), /* 다른 모듈들 */],
+})
+export class AppModule {}
+```
+
+`CqrsModule`이 `CommandBus`, `QueryBus`, `EventBus`를 자동 제공.
+
+---
+
+## §5+ 슬라이스별 상세
+
+§5 이후 항목 — 프런트엔드 구조, 에러 처리, 검증, 테스트 전략, 슬라이스별 상세 범위 — 은 **각 슬라이스 plan 문서에서** 다룸.
+
+각 슬라이스 plan은 다음 위치에 작성:
+
+```
+docs/superpowers/specs/
+├── 2026-05-27-goods-mall-design.md   ← 이 문서 (Foundation)
+├── slice-0-bootstrap-plan.md         ← 슬라이스 시작 시 작성
+├── slice-1-auth-plan.md
+├── slice-2-catalog-plan.md
+├── slice-3-cart-plan.md
+├── slice-4-address-plan.md
+├── slice-5-order-plan.md
+└── slice-6-admin-plan.md
+```
+
+슬라이스 plan 문서 표준 구성:
+1. **범위** — 무엇을 만들고 무엇은 안 만드는지
+2. **API 엔드포인트 목록** — 메서드/경로/요청/응답
+3. **프런트엔드 페이지/컴포넌트** — 라우트와 주요 UI
+4. **DB 마이그레이션 차분** — 이 슬라이스에서 추가/변경되는 모델
+5. **검증·에러 처리** — DTO 검증, 도메인 예외, HTTP 매핑
+6. **테스트** — 작성할 단위 테스트 목록
+7. **작업 순서** — 백엔드 → 프런트엔드 등 단계
+8. **회고 (구현 후 작성)** — 발견한 문제, Foundation 갱신 사항
+
+---
+
+## 슬라이스 로드맵
+
+| # | 슬라이스 | 핵심 기능 | 적용 Foundation |
+|---|---------|----------|----------------|
+| 0 | Bootstrap | Docker(MariaDB) + NestJS + Next.js + Prisma + `/health` | §1, §2(기본 셋업) |
+| 1 | Auth | 회원가입/로그인, JWT Refresh Rotation, Google OAuth, 계정 연결 | §2(User/OAuthAccount/RefreshToken), §3 전체 |
+| 2 | Catalog | 상품 목록/상세 + seed | §2(Product), §4.2(단순 계층) |
+| 3 | Cart | 장바구니 추가/삭제/수량변경 (DDD) | §2(CartItem), §4.3-4.7(Clean Architecture) |
+| 4 | Address | 마이페이지 주소 CRUD + 기본 주소 + 카카오 우편번호 API | §2(Address) |
+| 5 | Order | 주문 생성 + 결제 시뮬레이션 + 주문내역 (DDD) | §2(Order/OrderItem), §4.3-4.8 |
+| 6 | Admin | 관리자 상품 CRUD + 이미지 업로드 | §2(Product), §4.2 |
