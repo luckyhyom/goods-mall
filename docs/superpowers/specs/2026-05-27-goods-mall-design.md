@@ -72,7 +72,8 @@
 | DB | MariaDB |
 | ORM | Prisma (`mysql` provider, MariaDB 호환) |
 | 인증 | 이메일+패스워드(bcrypt) + Google OAuth |
-| 토큰 저장 | HttpOnly Secure Cookie (세션 또는 JWT — §3에서 결정) |
+| 토큰 방식 | JWT (Access) + Opaque Refresh Token (Rotation) — 자세한 내용은 §3 |
+| 토큰 전송 | `Authorization: Bearer <token>` 헤더 (웹·모바일 통일) |
 | API 통신 | REST + JSON |
 | UI 라이브러리 | Tailwind CSS + shadcn/ui |
 | 테스트 | Jest (단위 테스트, 핵심 도메인) |
@@ -121,8 +122,8 @@ goods-mall/
 │   │   ├── components/
 │   │   │   └── ui/             ← shadcn/ui 생성 컴포넌트
 │   │   ├── lib/
-│   │   │   ├── api.ts          ← fetch 래퍼
-│   │   │   └── auth.ts         ← 세션 확인 헬퍼
+│   │   │   ├── api.ts          ← fetch 래퍼 (자동 refresh 포함, §3.10)
+│   │   │   └── auth-store.ts   ← Zustand 인증 상태 (§3.10)
 │   │   └── types/              ← API 응답 타입 (수동 정의)
 │   ├── public/
 │   ├── .env.example
