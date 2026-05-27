@@ -15,7 +15,7 @@
 - 슬라이스 진행 중 발견한 보완점은 해당 슬라이스 문서 또는 이 문서에 회고로 반영
 
 **최소 모듈 단위로 진행**하며, 각 슬라이스는:
-1. 슬라이스 시작 전 별도 plan 문서 작성 (`docs/superpowers/specs/<n>-<slice>-plan.md`)
+1. 슬라이스 시작 전 별도 plan 문서 작성 (`docs/specs/<n>-<slice>-plan.md`)
 2. 구현
 3. 회고에서 Foundation 갱신 필요 여부 확인
 
@@ -30,7 +30,7 @@
 - [ ] §5~ 슬라이스별 plan으로 분리 — 슬라이스 시작 시점에 작성
 
 관련 문서:
-- [DDD 적용 규칙](../../architecture/ddd-rules.md) — 모든 슬라이스에 적용
+- [DDD 적용 규칙](../architecture/ddd-rules.md) — 모든 슬라이스에 적용
 
 ---
 
@@ -133,9 +133,8 @@ goods-mall/
 ├── docs/
 │   ├── architecture/
 │   │   └── ddd-rules.md        ← DDD 적용 규칙
-│   └── superpowers/
-│       └── specs/
-│           └── 2026-05-27-goods-mall-design.md   ← 이 문서
+│   └── specs/
+│       └── 2026-05-27-goods-mall-design.md   ← 이 문서
 │
 ├── docker-compose.yml          ← MariaDB
 ├── .gitignore
@@ -430,7 +429,7 @@ model OrderItem {
 | **OrderItem에 상품 스냅샷** | 상품 가격/이름 변경되어도 과거 주문은 그대로 유지 |
 | **User에서 provider 필드 제거, OAuthAccount 분리** | 한 사용자가 LOCAL + 여러 OAuth를 동시 보유 가능. 계정 연결(account linking) 지원 |
 | **RefreshToken 별도 테이블** | JWT rotation + 재사용 감지 위해 DB에 hash 저장 필요. JWT의 stateless 이점 일부 포기 대신 무효화/도난 탐지 가능 |
-| **Cart 테이블 없음** | DDD 원칙: Aggregate ≠ Table 1:1. Cart 자체에 의미 있는 상태가 없으므로 cart_items만 두고 Repository가 재구성. 자세한 근거는 [DDD 적용 규칙 §1.1](../../architecture/ddd-rules.md) 참고 |
+| **Cart 테이블 없음** | DDD 원칙: Aggregate ≠ Table 1:1. Cart 자체에 의미 있는 상태가 없으므로 cart_items만 두고 Repository가 재구성. 자세한 근거는 [DDD 적용 규칙 §1.1](../architecture/ddd-rules.md) 참고 |
 | **`CartItem.userId` 직접 보유** | Cart 테이블 제거에 따른 자연스러운 결과. `@@unique([userId, productId])`로 중복 방지 |
 | **다중 주소 + `isDefault` 플래그** | 실제 이커머스 UX. 한 유저가 여러 주소를 등록할 수 있고 기본 주소는 1개 |
 | **Address 완전 정규화** (sido/sigungu/bname/roadName) | 지역별 통계 쿼리 가능, 카카오 API 응답과 매핑 가능 |
@@ -828,7 +827,7 @@ src/modules/<name>/
 
 ### §4.3 Clean Architecture 패턴 (cart, order)
 
-폴더 구조와 책임은 [DDD 적용 규칙 §2](../../architecture/ddd-rules.md#2-폴더-구조-aggregate-모듈) 참고.
+폴더 구조와 책임은 [DDD 적용 규칙 §2](../architecture/ddd-rules.md#2-폴더-구조-aggregate-모듈) 참고.
 
 요약:
 - `domain/` — AggregateRoot, Entity, ValueObject, Repository 인터페이스, Domain Event
@@ -977,7 +976,7 @@ export class AppModule {}
 각 슬라이스 plan은 다음 위치에 작성:
 
 ```
-docs/superpowers/specs/
+docs/specs/
 ├── 2026-05-27-goods-mall-design.md   ← 이 문서 (Foundation)
 ├── slice-0-bootstrap-plan.md         ← 슬라이스 시작 시 작성
 ├── slice-1-auth-plan.md
