@@ -344,6 +344,9 @@ model CartItem {
 
 ```ts
 // src/modules/cart/domain/cart.aggregate.ts
+// @nestjs/cqrs import 없음 — 순수 도메인 (shared/domain 자체 베이스 상속)
+import { AggregateRoot } from '../../../shared/domain/aggregate-root';
+
 export class Cart extends AggregateRoot {
   private constructor(
     public readonly userId: string,
@@ -359,7 +362,7 @@ export class Cart extends AggregateRoot {
   }
 
   addItem(productId: string, quantity: number): void {
-    // 불변식 검증 + 이벤트 발행
+    // 불변식 검증 + 상태 변경 후 addEvent() — 전체 패턴은 api-architecture.md §4
   }
 
   // ... removeItem, changeQuantity, clear, getTotalWon

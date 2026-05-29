@@ -104,9 +104,9 @@ presentation ──┐
 infrastructure ─┘
 ```
 
-- **domain 디렉토리에는 어떤 외부 import도 없다.**
+- **domain 디렉토리에는 어떤 외부 import도 없다.** (예외 없음 — 순수 TypeScript)
   - ❌ `@prisma/client` import
-  - ❌ `@nestjs/*` import (단, `@nestjs/cqrs`의 `AggregateRoot` 베이스는 예외 허용)
+  - ❌ `@nestjs/*` import (`AggregateRoot`도 `@nestjs/cqrs`가 아니라 `src/shared/domain`의 자체 베이스 사용)
   - ❌ `class-validator` import (검증은 application 또는 presentation)
 - **application은 domain의 인터페이스에만 의존한다.**
 - **infrastructure는 domain 인터페이스의 구현체를 제공한다.**
@@ -160,7 +160,8 @@ export class CartMapper {
 ## 6. CQRS (선택적, 균형 있게)
 
 ### 6.1 사용 도구
-- `@nestjs/cqrs`의 `CommandBus`, `QueryBus`, `EventBus`, `AggregateRoot` 사용.
+- `@nestjs/cqrs`의 `CommandBus`, `QueryBus`, `EventBus` 사용 — **application·presentation 계층 한정**.
+- `AggregateRoot` 베이스는 `@nestjs/cqrs`가 아니라 `src/shared/domain`의 **자체 정의**(프레임워크 무관)를 상속.
 
 ### 6.2 적용 강도
 - **Write (Command)**: 항상 Aggregate를 통과. 도메인 행위 메서드 호출 → Repository 저장.
@@ -168,9 +169,9 @@ export class CartMapper {
   - 이유: N+1 회피, 화면 전용 조인이 많을 때 도메인 객체 재구성이 낭비.
 
 ### 6.3 Domain Event
-- AggregateRoot 내부에서 `this.apply(new XxxEvent(...))` 호출.
-- 트랜잭션 커밋 후 `EventBus`가 핸들러를 호출.
-- 처음에는 in-memory `EventEmitter`로 충분. 메시지 브로커는 필요해질 때 도입.
+- AggregateRoot 내부에서 `this.addEvent(new XxxEvent(...))`로 **기록**만 한다(상태 변경 후).
+- **발행**은 application 핸들러가: 저장 성공 후 `aggregate.pullEvents()`로 꺼내 `EventBus.publish()`.
+- 기본 `EventBus`는 인메모리·동기 발행(별도 트랜잭션). 메시지 브로커는 필요해질 때 도입.
 
 ---
 

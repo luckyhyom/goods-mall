@@ -72,7 +72,7 @@ goods-mall/
 │   │   │   ├── cart/           ← Clean Architecture (4계층)
 │   │   │   └── order/          ← Clean Architecture (4계층)
 │   │   ├── shared/
-│   │   │   ├── domain/         ← AggregateRoot, Entity, ValueObject 베이스
+│   │   │   ├── domain/         ← AggregateRoot, Entity, ValueObject 베이스 (프레임워크 무관)
 │   │   │   └── kernel/         ← 공통 타입, 유틸
 │   │   ├── prisma/
 │   │   │   └── prisma.service.ts
