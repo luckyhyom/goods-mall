@@ -9,3 +9,6 @@ dist/
 
 # Uploads (Slice 6)
 /uploads
+
+# Prisma 생성 클라이언트 (prisma generate로 재생성)
+/src/generated
