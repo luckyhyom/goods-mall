@@ -270,9 +270,10 @@ cd ..
 `api/prisma/schema.prisma`:
 ```prisma
 generator client {
-  provider     = "prisma-client"
-  output       = "../src/generated/prisma"
-  moduleFormat = "cjs"
+  provider            = "prisma-client"
+  output              = "../src/generated/prisma"
+  moduleFormat        = "cjs"
+  importFileExtension = ""
 }
 
 datasource db {
@@ -280,6 +281,7 @@ datasource db {
 }
 ```
 > v7 변화: 생성기는 `prisma-client`(엔진리스), `output` 필수, NestJS(CommonJS) 호환 위해 `moduleFormat = "cjs"`. datasource에 **url을 두지 않는다**(두면 P1012).
+> `importFileExtension = ""`: 기본값(`js`)이면 생성 코드가 `./x.js`를 import하는데 실제 파일은 `.ts`라 **jest(ts-jest) 리졸버가 모듈을 못 찾는다**(Task 4에서 발현). 확장자를 비우면 빌드·jest 양쪽이 해석 가능.
 
 - [ ] **Step 3: prisma.config.ts 작성 (migrate 연결정보)**
 
