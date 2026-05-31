@@ -39,6 +39,7 @@
 | `db/init/01-grant-shadow-db.sh` | MariaDB 최초 init 시 앱 유저에 shadow DB용 전역 권한 부여 |
 | `api/.env` / `api/.env.example` | `DATABASE_URL`(기존 `PORT`/`CORS_ORIGIN`에 추가) |
 | `web/` (create-next-app 생성물) | Next.js App Router 앱 루트 |
+| `web/next.config.ts` | Turbopack 루트 고정 (`root: __dirname`) — 상위 워크스페이스 lockfile 오인 방지 |
 | `web/src/app/page.tsx` | 홈 — API `/health` 호출해 표시 |
 | `web/.env.local` / `web/.env.example` | `NEXT_PUBLIC_API_URL` |
 | `README.md` | 실행 방법 |
@@ -526,18 +527,21 @@ git commit -m "feat(api): DB ping 포함 /health 엔드포인트 추가"
 
 ## Task 5: Next.js 스켈레톤 (web/)
 
+> **회고 메모(실제 구현 결과):** 실제 설치본은 **Next.js 16.2.6**(Node v24.16 환경)이었다. 최신 create-next-app은 ①`--disable-git`가 정상 동작해 중첩 `.git`을 만들지 않으며(`Skipping git initialization`), ②`CLAUDE.md`/`AGENTS.md`도 함께 스캐폴딩한다(그대로 커밋함). ③Next 16의 dev/build는 Turbopack 기본이고, **루트를 lockfile 위치로 자동 탐지**한다. 이 레포는 상위 워크스페이스(`/Users/hyomin/workspace`)에 형제 프로젝트 공용 `package-lock.json`이 있어 Turbopack이 루트를 그쪽으로 오인하는 경고가 떴다 → `web/next.config.ts`에 `turbopack.root = __dirname`을 명시해 `web/`으로 고정(Step 3). 상위 lockfile은 다른 프로젝트들 소유라 건드리지 않는다. 이 설정은 Vercel(루트 디렉터리 `web` 지정) 배포에선 사실상 no-op이라 무해하다.
+
 **Files:**
 - Create: `web/` (CLI 생성)
+- Modify: `web/next.config.ts` (Turbopack 루트 고정)
 
 - [ ] **Step 1: Next.js 프로젝트 생성**
 
-레포 루트에서 (Node 20 활성화 상태):
+레포 루트에서 (Node 20+ 활성화 상태, 실제 v24):
 ```bash
 npx -y create-next-app@latest web \
   --typescript --eslint --tailwind --app --src-dir \
-  --import-alias "@/*" --use-npm --disable-git
+  --import-alias "@/*" --use-npm --disable-git --yes
 ```
-Expected: `web/` 폴더 생성, 의존성 설치 완료. 남는 프롬프트가 있으면 기본값(Enter) 선택.
+Expected: `web/` 폴더 생성, 의존성 설치 완료. `--yes`로 남는 프롬프트(Turbopack 등) 기본값 자동 선택.
 
 - [ ] **Step 2: 중첩 git 저장소 제거 (생성됐을 경우 안전장치)**
 
@@ -546,17 +550,32 @@ rm -rf web/.git
 ```
 Expected: 에러 없음(없으면 그대로 통과). 루트 단일 저장소 유지.
 
-- [ ] **Step 3: 개발 서버 기동 확인**
+- [ ] **Step 3: Turbopack 루트 고정 (multiple-lockfiles 경고 제거)**
+
+`web/next.config.ts`의 `nextConfig`에 추가:
+```ts
+const nextConfig: NextConfig = {
+  // 상위 워크스페이스의 package-lock.json이 루트로 오인되지 않도록
+  // 이 web 디렉터리를 Turbopack 루트로 고정한다. (Vercel 배포 시엔 no-op)
+  turbopack: {
+    root: __dirname,
+  },
+};
+```
+> 이 단계를 건너뛰면 dev 로그에 `We detected multiple lockfiles ... selected ... /workspace/package-lock.json as the root directory` 경고가 뜬다. 기능엔 무해하나 와칭 범위가 불필요하게 넓어진다.
+
+- [ ] **Step 4: 개발 서버 기동 확인**
 
 Run: `cd web && npm run dev` (터미널에서 실행 후 확인)
-Expected: `http://localhost:3000` 에서 Next.js 기본 페이지 렌더링. 확인 후 Ctrl+C.
+Expected: `http://localhost:3000` 에서 Next.js 기본 페이지 렌더링, **lockfile 경고 없음**. 확인 후 Ctrl+C.
 
-- [ ] **Step 4: 커밋**
+- [ ] **Step 5: 커밋**
 
 ```bash
 git add web
 git commit -m "build(web): Next.js App Router 스켈레톤 생성"
 ```
+> `next.config.ts`의 Turbopack 루트 설정도 같은 커밋에 포함한다(스켈레톤 구성의 일부).
 
 ---
 
