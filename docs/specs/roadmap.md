@@ -7,10 +7,10 @@
 
 ## 진행 상태
 
-- [ ] **Slice 0 — Bootstrap**
-  - [ ] Plan 작성 (`slice-0-bootstrap-plan.md`)
-  - [ ] 구현
-  - [ ] 회고
+- [x] **Slice 0 — Bootstrap**
+  - [x] Plan 작성 (`slice-0-bootstrap-plan.md`)
+  - [x] 구현
+  - [x] 회고
 - [ ] **Slice 1 — Auth**
   - [ ] Plan 작성 (`slice-1-auth-plan.md`)
   - [ ] 구현
@@ -45,13 +45,13 @@
 **핵심 기능:** 개발 환경 구축
 - Docker Compose (MariaDB)
 - NestJS skeleton
-- Next.js App Router skeleton
-- Prisma 연결 + 첫 마이그레이션 (빈 schema)
-- `/health` 엔드포인트
+- Next.js App Router skeleton (Vercel 단독 배포 대상)
+- Prisma 7 어댑터 연결 + 마이그레이션 파이프라인 확립 (빈 schema라 첫 SQL 마이그레이션은 Slice 1에서 생성)
+- `/health` 엔드포인트 (DB ping → web 홈에서 표시)
 
 **참고 문서:** [foundation.md](./foundation.md)
 
-**Plan:** _(작성 후 링크)_
+**Plan:** [slice-0-bootstrap-plan.md](./slice-0-bootstrap-plan.md)
 
 ---
 
