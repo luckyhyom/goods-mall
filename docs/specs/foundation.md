@@ -2,6 +2,9 @@
 
 > 모든 슬라이스에 공통 적용되는 기반.
 > 변경 시 모든 슬라이스에 영향 — 신중히.
+>
+> **범위:** 이 레포는 **백엔드 API 전용**이다. 프런트엔드(Next.js)는 별도 레포로
+> 분리 예정이며, 본 문서의 API 계약(엔드포인트·데이터 모델·인증)을 소비한다.
 
 ---
 
@@ -27,7 +30,7 @@
 | **목적** | MVP 단기 완성 (포트폴리오/학습용 굿즈 쇼핑몰) |
 | **MVP 범위** | 핵심 거래 플로우 (회원가입 → 상품 → 장바구니 → 주문/결제 시뮬레이션 → 주문내역) |
 | **배포** | 로컬만 완성 (`docker compose up`) |
-| **진행 방식** | Vertical Slice — 슬라이스별 풀스택 단위 |
+| **진행 방식** | 슬라이스 단위 — 도메인별 API 절단면 |
 | **테스트 범위** | 핵심 도메인 로직 단위 테스트만 |
 
 상세 결정은 주제별 문서 참조:
@@ -44,17 +47,14 @@
 | 영역 | 선택 |
 |------|------|
 | API 서버 | NestJS (TypeScript) |
-| Web | Next.js (App Router, TypeScript) |
 | DB | MariaDB |
 | ORM | Prisma (`mysql` provider, MariaDB 호환) |
 | 인증 | 이메일+패스워드(bcrypt) + Google OAuth |
 | 토큰 방식 | JWT (Access) + Opaque Refresh Token (Rotation) — 자세한 내용은 [auth-strategy.md](./auth-strategy.md) |
 | 토큰 전송 | `Authorization: Bearer <token>` 헤더 (웹·모바일 통일) |
 | API 통신 | REST + JSON |
-| UI 라이브러리 | Tailwind CSS + shadcn/ui |
 | 테스트 | Jest (단위 테스트, 핵심 도메인) |
-| 우편번호 | 카카오 우편번호 API (무료, 키 불필요) |
-| 로컬 환경 | Docker Compose (MariaDB), 호스트에서 api/web 실행 |
+| 로컬 환경 | Docker Compose (MariaDB), 호스트에서 api 실행 |
 
 ---
 
@@ -89,25 +89,6 @@ goods-mall/
 │   ├── tsconfig.json
 │   └── package.json
 │
-├── web/                        ← Next.js (App Router)
-│   ├── src/
-│   │   ├── app/
-│   │   │   ├── (auth)/         ← 로그인/회원가입 (no header)
-│   │   │   ├── (shop)/         ← 상품/카트/주문 (header 포함)
-│   │   │   ├── (mypage)/       ← 마이페이지(주소/주문내역)
-│   │   │   ├── admin/          ← 관리자 페이지
-│   │   │   └── layout.tsx
-│   │   ├── components/
-│   │   │   └── ui/             ← shadcn/ui 생성 컴포넌트
-│   │   ├── lib/
-│   │   │   ├── api.ts          ← fetch 래퍼 (자동 refresh 포함)
-│   │   │   └── auth-store.ts   ← Zustand 인증 상태
-│   │   └── types/              ← API 응답 타입 (수동 정의)
-│   ├── public/
-│   ├── .env.example
-│   ├── tailwind.config.ts
-│   └── package.json
-│
 ├── docs/
 │   ├── architecture/
 │   │   └── ddd-rules.md
@@ -126,7 +107,7 @@ goods-mall/
 
 ### 핵심 결정 사항
 
-- `api`, `web`는 각자 독립적인 `package.json` — 모노레포 툴링 없이 단순하게
-- 타입 공유는 `web/src/types/`에 **수동으로 동기화** (OpenAPI 자동 생성은 학습 부담 추가되므로 보류)
+- `api`는 독립적인 `package.json` — 모노레포 툴링 없이 단순하게
+- 프런트엔드는 별도 레포에서 API 응답 타입을 **수동으로 동기화** (OpenAPI 자동 생성은 학습 부담 추가되므로 보류)
 - 이미지는 NestJS의 `ServeStaticModule`로 `/uploads`를 정적 서빙
-- 로컬 개발: MariaDB만 Docker로, api와 web은 호스트에서 실행 (빠른 hot reload)
+- 로컬 개발: MariaDB만 Docker로, api는 호스트에서 실행 (빠른 hot reload)

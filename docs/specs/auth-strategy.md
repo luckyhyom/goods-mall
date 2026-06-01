@@ -21,7 +21,7 @@
 
 | 항목 | 웹 | 모바일 |
 |------|-----|-------|
-| Access 보관 | JS 메모리 (Zustand) | Keychain / Keystore |
+| Access 보관 | JS 메모리 (인메모리 스토어) | Keychain / Keystore |
 | Refresh 보관 | localStorage + 메모리 | Keychain / Keystore |
 | 토큰 전송 | `Authorization: Bearer <token>` | 동일 |
 | 토큰 응답 | JSON body `{ user, accessToken, refreshToken }` | 동일 |
@@ -222,52 +222,7 @@ WEB_BASE_URL=http://localhost:3001
 
 ---
 
-## 10. 프런트엔드 토큰 관리 패턴
-
-```ts
-// lib/auth-store.ts (Zustand)
-type AuthState = {
-  user: User | null;
-  accessToken: string | null;
-  refreshToken: string | null;
-  setTokens: (a: string, r: string) => void;
-  clearTokens: () => void;
-  refresh: () => Promise<boolean>;
-};
-
-// localStorage 동기화는 zustand persist 미들웨어로
-// accessToken은 persist 대상에서 제외 (메모리만)
-
-// lib/api.ts (fetch 래퍼 with 자동 refresh)
-export async function apiFetch(url: string, init: RequestInit = {}) {
-  const { accessToken, refresh } = useAuth.getState();
-  const doFetch = (token: string | null) =>
-    fetch(url, {
-      ...init,
-      headers: {
-        ...init.headers,
-        ...(token ? { Authorization: `Bearer ${token}` } : {}),
-      },
-    });
-
-  let res = await doFetch(accessToken);
-  if (res.status === 401 && (await refresh())) {
-    res = await doFetch(useAuth.getState().accessToken);
-  }
-  return res;
-}
-
-// 부팅 시 (RootProvider)
-useEffect(() => {
-  if (useAuth.getState().refreshToken) {
-    useAuth.getState().refresh();
-  }
-}, []);
-```
-
----
-
-## 11. 권한 모델
+## 10. 권한 모델
 
 | Role | 권한 |
 |------|------|
@@ -279,7 +234,7 @@ useEffect(() => {
 
 ---
 
-## 12. 모바일 지원
+## 11. 모바일 지원
 
 본 설계는 처음부터 헤더 기반 일원화되어 있어, 모바일 클라이언트 추가 시 **백엔드 변경 없이** 지원 가능. 단, OAuth 콜백은 모바일에서 custom URL scheme(`myapp://oauth-success`)으로 redirect URL만 변경.
 

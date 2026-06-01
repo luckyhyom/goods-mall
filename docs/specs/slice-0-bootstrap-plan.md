@@ -2,11 +2,11 @@
 
 > **For agentic workers:** REQUIRED SUB-SKILL: Use superpowers:subagent-driven-development (recommended) or superpowers:executing-plans to implement this plan task-by-task. Steps use checkbox (`- [ ]`) syntax for tracking.
 
-**Goal:** `docker compose up` + api/web 실행만으로 web→api→MariaDB가 끝까지 연결된 풀스택 개발 환경을 구축한다.
+**Goal:** `docker compose up` + api 실행만으로 api→MariaDB가 끝까지 연결된 API 개발 환경을 구축한다.
 
-**Architecture:** 모노레포 툴링 없이 루트에 독립적인 `api/`(NestJS), `web/`(Next.js App Router)를 둔다. MariaDB만 Docker로 띄우고 api/web은 호스트에서 실행한다. `/health`가 Prisma로 DB를 ping해 전 계층 연결을 증명하고, web 홈이 그 `/health`를 호출해 화면에 표시한다.
+**Architecture:** 모노레포 툴링 없이 루트에 독립적인 `api/`(NestJS)를 둔다. MariaDB만 Docker로 띄우고 api는 호스트에서 실행한다. `/health`가 Prisma로 DB를 ping해 전 계층 연결을 증명한다.
 
-**Tech Stack:** NestJS 11, Next.js(App Router, TS), MariaDB 11, Prisma 7(`mysql` provider + `@prisma/adapter-mariadb` 드라이버 어댑터), Tailwind CSS, Jest, Docker Compose
+**Tech Stack:** NestJS 11, MariaDB 11, Prisma 7(`mysql` provider + `@prisma/adapter-mariadb` 드라이버 어댑터), Jest, Docker Compose
 
 > **Prisma 7 주의:** v7은 Rust 엔진을 제거하고 드라이버 어댑터로 전환됐다. `schema.prisma`의 `datasource.url`이 사라지고, 연결정보는 migrate용 `prisma.config.ts`와 런타임 어댑터로 분리된다. 생성 클라이언트는 NestJS(CommonJS) 호환을 위해 `moduleFormat = "cjs"`로 뽑고 `src/generated/prisma`에 출력한다. 자세한 배경은 Task 3 참조.
 
@@ -38,17 +38,13 @@
 | `api/tsconfig.build.json` | 빌드 시 `prisma.config.ts` 제외 (dist 엔트리 경로 보존) |
 | `db/init/01-grant-shadow-db.sh` | MariaDB 최초 init 시 앱 유저에 shadow DB용 전역 권한 부여 |
 | `api/.env` / `api/.env.example` | `DATABASE_URL`(기존 `PORT`/`CORS_ORIGIN`에 추가) |
-| `web/` (create-next-app 생성물) | Next.js App Router 앱 루트 |
-| `web/next.config.ts` | Turbopack 루트 고정 (`root: __dirname`) — 상위 워크스페이스 lockfile 오인 방지 |
-| `web/src/app/page.tsx` | 홈 — API `/health` 호출해 표시 |
-| `web/.env.local` / `web/.env.example` | `NEXT_PUBLIC_API_URL` |
 | `README.md` | 실행 방법 |
 
 ---
 
 ## Task 0: 사전 요구사항 (Node 20 LTS)
 
-**문제:** 호스트 nvm default가 v18.15.0이었다. Next.js(`>=18.18`)뿐 아니라 **Prisma 7이 Node `^20.19 || ^22.12 || >=24.0`을 요구**하므로 18.x에선 `prisma` 설치 자체가 preinstall 단계에서 거부된다. 최신 LTS(현재 v24.x = krypton)로 올리고, 매 세션 `nvm use`를 피하도록 nvm default를 최신 LTS로 고정한다.
+**문제:** 호스트 nvm default가 v18.15.0이었다. **Prisma 7이 Node `^20.19 || ^22.12 || >=24.0`을 요구**하므로 18.x에선 `prisma` 설치 자체가 preinstall 단계에서 거부된다. 최신 LTS(현재 v24.x = krypton)로 올리고, 매 세션 `nvm use`를 피하도록 nvm default를 최신 LTS로 고정한다.
 
 - [ ] **Step 1: 현재 버전 확인**
 
@@ -71,7 +67,7 @@ Run: `node -v && npm -v`
 Expected: `v24.x` (이상), npm 11.x
 
 > 이 슬라이스의 모든 후속 명령은 최신 LTS 활성화 상태에서 실행한다. 커밋 없음(환경 설정).
-> Node 24는 NestJS 11 / Next.js / Prisma 7(>=24.0)을 모두 충족한다.
+> Node 24는 NestJS 11 / Prisma 7(>=24.0)을 모두 충족한다.
 
 ---
 
@@ -525,130 +521,7 @@ git commit -m "feat(api): DB ping 포함 /health 엔드포인트 추가"
 
 ---
 
-## Task 5: Next.js 스켈레톤 (web/)
-
-> **회고 메모(실제 구현 결과):** 실제 설치본은 **Next.js 16.2.6**(Node v24.16 환경)이었다. 최신 create-next-app은 ①`--disable-git`가 정상 동작해 중첩 `.git`을 만들지 않으며(`Skipping git initialization`), ②`CLAUDE.md`/`AGENTS.md`도 함께 스캐폴딩한다(그대로 커밋함). ③Next 16의 dev/build는 Turbopack 기본이고, **루트를 lockfile 위치로 자동 탐지**한다. 이 레포는 상위 워크스페이스(`/Users/hyomin/workspace`)에 형제 프로젝트 공용 `package-lock.json`이 있어 Turbopack이 루트를 그쪽으로 오인하는 경고가 떴다 → `web/next.config.ts`에 `turbopack.root = __dirname`을 명시해 `web/`으로 고정(Step 3). 상위 lockfile은 다른 프로젝트들 소유라 건드리지 않는다. 이 설정은 Vercel(루트 디렉터리 `web` 지정) 배포에선 사실상 no-op이라 무해하다.
-
-**Files:**
-- Create: `web/` (CLI 생성)
-- Modify: `web/next.config.ts` (Turbopack 루트 고정)
-
-- [ ] **Step 1: Next.js 프로젝트 생성**
-
-레포 루트에서 (Node 20+ 활성화 상태, 실제 v24):
-```bash
-npx -y create-next-app@latest web \
-  --typescript --eslint --tailwind --app --src-dir \
-  --import-alias "@/*" --use-npm --disable-git --yes
-```
-Expected: `web/` 폴더 생성, 의존성 설치 완료. `--yes`로 남는 프롬프트(Turbopack 등) 기본값 자동 선택.
-
-- [ ] **Step 2: 중첩 git 저장소 제거 (생성됐을 경우 안전장치)**
-
-```bash
-rm -rf web/.git
-```
-Expected: 에러 없음(없으면 그대로 통과). 루트 단일 저장소 유지.
-
-- [ ] **Step 3: Turbopack 루트 고정 (multiple-lockfiles 경고 제거)**
-
-`web/next.config.ts`의 `nextConfig`에 추가:
-```ts
-const nextConfig: NextConfig = {
-  // 상위 워크스페이스의 package-lock.json이 루트로 오인되지 않도록
-  // 이 web 디렉터리를 Turbopack 루트로 고정한다. (Vercel 배포 시엔 no-op)
-  turbopack: {
-    root: __dirname,
-  },
-};
-```
-> 이 단계를 건너뛰면 dev 로그에 `We detected multiple lockfiles ... selected ... /workspace/package-lock.json as the root directory` 경고가 뜬다. 기능엔 무해하나 와칭 범위가 불필요하게 넓어진다.
-
-- [ ] **Step 4: 개발 서버 기동 확인**
-
-Run: `cd web && npm run dev` (터미널에서 실행 후 확인)
-Expected: `http://localhost:3000` 에서 Next.js 기본 페이지 렌더링, **lockfile 경고 없음**. 확인 후 Ctrl+C.
-
-- [ ] **Step 5: 커밋**
-
-```bash
-git add web
-git commit -m "build(web): Next.js App Router 스켈레톤 생성"
-```
-> `next.config.ts`의 Turbopack 루트 설정도 같은 커밋에 포함한다(스켈레톤 구성의 일부).
-
----
-
-## Task 6: web → api `/health` 통합
-
-**Files:**
-- Create: `web/.env.local`, `web/.env.example`
-- Modify: `web/src/app/page.tsx`
-
-- [ ] **Step 1: 환경변수 파일 작성**
-
-`web/.env.local`:
-```
-NEXT_PUBLIC_API_URL=http://localhost:4000
-```
-
-`web/.env.example`:
-```
-NEXT_PUBLIC_API_URL=http://localhost:4000
-```
-
-- [ ] **Step 2: 홈 페이지를 health 표시용으로 교체**
-
-`web/src/app/page.tsx`:
-```tsx
-type Health = { status: string; db?: string };
-
-async function getHealth(): Promise<Health> {
-  try {
-    const res = await fetch(`${process.env.NEXT_PUBLIC_API_URL}/health`, {
-      cache: 'no-store',
-    });
-    if (!res.ok) return { status: 'error' };
-    return (await res.json()) as Health;
-  } catch {
-    return { status: 'unreachable' };
-  }
-}
-
-export default async function Home() {
-  const health = await getHealth();
-  return (
-    <main className="flex min-h-screen flex-col items-center justify-center gap-3">
-      <h1 className="text-3xl font-bold">goods-mall</h1>
-      <p className="text-sm text-gray-500">
-        API: <span className="font-mono">{health.status}</span>
-        {health.db ? ` · DB: ${health.db}` : ''}
-      </p>
-    </main>
-  );
-}
-```
-
-- [ ] **Step 3: 통합 수동 검증 (3개 모두 기동)**
-
-1. `docker compose up -d` (MariaDB)
-2. 터미널 A: `cd api && npm run start:dev`
-3. 터미널 B: `cd web && npm run dev`
-4. 브라우저: `http://localhost:3000`
-
-Expected: 페이지에 `API: ok · DB: up` 표시 → web→api→DB 전 계층 연결 확인
-
-- [ ] **Step 4: 커밋**
-
-```bash
-git add web/src/app/page.tsx web/.env.example
-git commit -m "feat(web): 홈에서 API health 상태 표시"
-```
-> `web/.env.local`은 `.gitignore`로 제외됨 — 정상.
-
----
-
-## Task 7: README + 최종 검증 + roadmap 갱신
+## Task 5: README + 최종 검증 + roadmap 갱신
 
 **Files:**
 - Create: `README.md`
@@ -658,9 +531,9 @@ git commit -m "feat(web): 홈에서 API health 상태 표시"
 
 `README.md`:
 ```markdown
-# goods-mall
+# goods-mall (API)
 
-포트폴리오/학습용 굿즈 쇼핑몰 MVP. 설계 문서는 [docs/specs](./docs/specs).
+포트폴리오/학습용 굿즈 쇼핑몰 MVP의 백엔드 API. 설계 문서는 [docs/specs](./docs/specs).
 
 ## 사전 요구사항
 - Node 20 LTS 이상
@@ -678,15 +551,9 @@ cp .env.example .env   # 최초 1회
 npm install            # 최초 1회
 npx prisma migrate dev # 최초 1회
 npm run start:dev
-
-# 3. Web (포트 3000) — 새 터미널
-cd web
-cp .env.example .env.local  # 최초 1회
-npm install                 # 최초 1회
-npm run dev
 ```
 
-브라우저에서 http://localhost:3000 접속 → `API: ok · DB: up` 표시되면 성공.
+`curl -s http://localhost:4000/health` → `{"status":"ok","db":"up"}` 이면 성공.
 ```
 
 - [ ] **Step 2: 전체 통합 재검증 (클린 체크)**
@@ -696,7 +563,6 @@ npm run dev
 2. `cd api && npm run build && cd ..` → 컴파일 성공
 3. `cd api && npx jest && cd ..` → 모든 테스트 PASS
 4. `curl -s http://localhost:4000/health` (서버 기동 상태) → `{"status":"ok","db":"up"}`
-5. http://localhost:3000 → `API: ok · DB: up`
 
 - [ ] **Step 3: roadmap 체크박스 갱신**
 
@@ -724,13 +590,11 @@ git commit -m "docs: README 작성 및 Slice 0 완료 반영"
 
 ## Self-Review (작성자 체크 결과)
 
-**1. Spec coverage (roadmap Slice 0 핵심 기능 5개):**
+**1. Spec coverage (roadmap Slice 0 핵심 기능):**
 - Docker Compose (MariaDB) → Task 1 (+ shadow DB 권한 Task 1.5) ✅
 - NestJS skeleton → Task 2 ✅
-- Next.js App Router skeleton → Task 5 ✅
 - Prisma 연결 + 첫 마이그레이션 → Task 3 ✅ (Prisma 7 어댑터 기준, 빈 스키마 동작 한계 명시)
 - `/health` 엔드포인트 → Task 4 ✅
-- (추가) 풀스택 통합 증명 → Task 6 ✅
 
 **2. Placeholder scan:** TBD/TODO/"적절히 처리" 없음. 모든 코드/명령 구체화됨.
 

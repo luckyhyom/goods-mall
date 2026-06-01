@@ -2,6 +2,9 @@
 
 > 각 슬라이스 진행 상태와 다음 단계 추적.
 > 슬라이스 완료마다 체크박스 갱신.
+>
+> **범위:** 백엔드 API 전용. 각 슬라이스는 도메인별 API 절단면을 완성한다.
+> 프런트엔드(화면)는 별도 레포에서 이 API를 소비한다.
 
 ---
 
@@ -45,9 +48,8 @@
 **핵심 기능:** 개발 환경 구축
 - Docker Compose (MariaDB)
 - NestJS skeleton
-- Next.js App Router skeleton (Vercel 단독 배포 대상)
 - Prisma 7 어댑터 연결 + 마이그레이션 파이프라인 확립 (빈 schema라 첫 SQL 마이그레이션은 Slice 1에서 생성)
-- `/health` 엔드포인트 (DB ping → web 홈에서 표시)
+- `/health` 엔드포인트 (DB ping)
 
 **참고 문서:** [foundation.md](./foundation.md)
 
@@ -63,7 +65,6 @@
 - Google OAuth (URL fragment 콜백)
 - 계정 연결 (LOCAL + OAuth)
 - JwtAuthGuard / AdminGuard
-- 프런트 Zustand auth-store + fetch 래퍼
 
 **참고 문서:**
 - [foundation.md](./foundation.md)
@@ -77,8 +78,8 @@
 ### Slice 2 — Catalog
 
 **핵심 기능:**
-- 상품 목록 페이지 (페이지네이션)
-- 상품 상세 페이지
+- 상품 목록 API (페이지네이션)
+- 상품 상세 API
 - Prisma seed (10~30개 더미 상품)
 
 **참고 문서:**
@@ -112,10 +113,9 @@
 ### Slice 4 — Address
 
 **핵심 기능:**
-- 마이페이지 주소 목록 / 추가 / 수정 / 삭제
+- 주소 목록 / 추가 / 수정 / 삭제 API
 - 기본 주소 설정 (`isDefault` 1개 유지)
-- 카카오 우편번호 API 연동
-- `extractRoadName` 유틸
+- `extractRoadName` 유틸 (우편번호 검색은 클라이언트에서 호출, 결과를 저장)
 
 **참고 문서:**
 - [foundation.md](./foundation.md)
@@ -128,12 +128,12 @@
 ### Slice 5 — Order (DDD)
 
 **핵심 기능:**
-- 주문 결제 화면 (장바구니 → 배송지 선택 → 결제 시뮬레이션)
+- 주문 생성 API (장바구니 → 배송지 선택 → 결제 시뮬레이션)
 - Order Aggregate + OrderItem Entity
 - 주문 생성 (Cart → Order 변환, 상품·주소 스냅샷)
 - 결제 시뮬레이션 (PENDING → PAID)
 - `OrderPlacedEvent` → Product 재고 차감 핸들러
-- 주문내역 페이지 + 주문 상세
+- 주문내역 / 주문 상세 조회 API
 - `orderNumber` 발급 ("ORD-YYYYMMDD-XXXX")
 
 **참고 문서:**
@@ -151,7 +151,7 @@
 ### Slice 6 — Admin
 
 **핵심 기능:**
-- 관리자 상품 CRUD UI
+- 관리자 상품 CRUD API
 - 이미지 업로드 (Multer + 로컬 디스크 `uploads/`)
 - ServeStaticModule로 `/uploads` 정적 서빙
 - AdminGuard로 권한 체크
