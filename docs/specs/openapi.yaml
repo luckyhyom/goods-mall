@@ -1,0 +1,908 @@
+openapi: 3.1.0
+info:
+  title: goods-mall API
+  version: 1.0.0
+  description: >
+    포트폴리오/학습용 굿즈 쇼핑몰 MVP의 백엔드 API.
+    성공 응답은 봉투 없이 리소스 DTO를 반환하고, 에러는 RFC 9457 Problem Details
+    (`application/problem+json`) + 안정적 `code` 필드로 통일한다.
+    상세 설계는 docs/specs/api-spec.md 참고.
+
+servers:
+  - url: http://localhost:4000
+    description: 로컬 개발 (api/v1 prefix는 경로에 포함, /health만 prefix 밖)
+
+tags:
+  - name: Auth
+  - name: Product
+  - name: Cart
+  - name: Address
+  - name: Order
+  - name: Admin
+  - name: System
+
+security:
+  - bearerAuth: []
+
+paths:
+  # ───────────────────────── Auth ─────────────────────────
+  /api/v1/auth/signup:
+    post:
+      tags: [Auth]
+      summary: 회원가입
+      security: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/SignupRequest' }
+      responses:
+        '201':
+          description: 생성됨
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/AuthResult' }
+        '409':
+          $ref: '#/components/responses/Problem'   # AUTH_EMAIL_TAKEN
+        '422':
+          $ref: '#/components/responses/ValidationProblem'
+
+  /api/v1/auth/login:
+    post:
+      tags: [Auth]
+      summary: 로그인
+      security: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/LoginRequest' }
+      responses:
+        '200':
+          description: OK
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/AuthResult' }
+        '401':
+          $ref: '#/components/responses/Problem'   # AUTH_INVALID_CREDENTIALS, AUTH_LOCAL_DISABLED
+        '422':
+          $ref: '#/components/responses/ValidationProblem'
+
+  /api/v1/auth/refresh:
+    post:
+      tags: [Auth]
+      summary: 토큰 rotation (의도적 비멱등)
+      description: 본문의 refreshToken이 권한 증명. 매 호출 새 refresh 발급, 기존 revoke.
+      security: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/RefreshRequest' }
+      responses:
+        '200':
+          description: OK
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/TokenPair' }
+        '401':
+          $ref: '#/components/responses/Problem'   # AUTH_REFRESH_INVALID, AUTH_TOKEN_EXPIRED, AUTH_REFRESH_REUSED
+
+  /api/v1/auth/logout:
+    post:
+      tags: [Auth]
+      summary: 로그아웃 (refresh revoke)
+      security: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/RefreshRequest' }
+      responses:
+        '204':
+          description: No Content
+
+  /api/v1/auth/me:
+    get:
+      tags: [Auth]
+      summary: 내 정보
+      responses:
+        '200':
+          description: OK
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  user: { $ref: '#/components/schemas/User' }
+                required: [user]
+        '401':
+          $ref: '#/components/responses/Problem'
+
+  /api/v1/auth/google:
+    get:
+      tags: [Auth]
+      summary: Google OAuth 시작
+      security: []
+      responses:
+        '302':
+          description: Google 인증 페이지로 리디렉트
+
+  /api/v1/auth/google/callback:
+    get:
+      tags: [Auth]
+      summary: Google OAuth 콜백
+      description: >
+        결과에 따라 fragment redirect.
+        로그인 성공 → `{WEB_BASE_URL}/auth/oauth-success#accessToken=…&refreshToken=…`,
+        계정 연결 필요 → `{WEB_BASE_URL}/auth/link?pending=<pending_jwt>`.
+      security: []
+      parameters:
+        - { name: code, in: query, required: true, schema: { type: string } }
+      responses:
+        '302':
+          description: 프런트로 리디렉트(토큰 fragment 또는 pending)
+
+  /api/v1/auth/link:
+    post:
+      tags: [Auth]
+      summary: 계정 연결 (LOCAL ↔ OAuth)
+      description: 본문의 pending JWT + 기존 패스워드가 권한 증명.
+      security: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/LinkRequest' }
+      responses:
+        '200':
+          description: OK
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/AuthResult' }
+        '401':
+          $ref: '#/components/responses/Problem'   # AUTH_LINK_INVALID
+
+  # ───────────────────────── Product ─────────────────────────
+  /api/v1/products:
+    get:
+      tags: [Product]
+      summary: 상품 목록 (공개, isActive=true만)
+      security: []
+      parameters:
+        - { name: q, in: query, schema: { type: string }, description: 이름 검색 }
+        - { name: minPriceWon, in: query, schema: { type: integer, minimum: 0 } }
+        - { name: maxPriceWon, in: query, schema: { type: integer, minimum: 0 } }
+        - name: sort
+          in: query
+          schema: { type: string, enum: [latest, price_asc, price_desc], default: latest }
+        - $ref: '#/components/parameters/Limit'
+        - $ref: '#/components/parameters/Offset'
+      responses:
+        '200':
+          description: OK
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  items:
+                    type: array
+                    items: { $ref: '#/components/schemas/ProductSummary' }
+                  page: { $ref: '#/components/schemas/Page' }
+                required: [items, page]
+
+  /api/v1/products/{id}:
+    get:
+      tags: [Product]
+      summary: 상품 상세 (공개)
+      security: []
+      parameters:
+        - $ref: '#/components/parameters/PathId'
+      responses:
+        '200':
+          description: OK
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/Product' }
+        '404':
+          $ref: '#/components/responses/Problem'   # PRODUCT_NOT_FOUND
+
+  # ───────────────────────── Cart ─────────────────────────
+  /api/v1/cart:
+    get:
+      tags: [Cart]
+      summary: 내 카트 조회
+      responses:
+        '200': { $ref: '#/components/responses/Cart' }
+        '401': { $ref: '#/components/responses/Problem' }
+    delete:
+      tags: [Cart]
+      summary: 카트 비우기
+      responses:
+        '204': { description: No Content }
+        '401': { $ref: '#/components/responses/Problem' }
+
+  /api/v1/cart/items:
+    post:
+      tags: [Cart]
+      summary: 카트 담기 (중복 시 수량 합산)
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/CartAddRequest' }
+      responses:
+        '200': { $ref: '#/components/responses/Cart' }
+        '404':
+          $ref: '#/components/responses/Problem'   # PRODUCT_NOT_FOUND
+        '409':
+          $ref: '#/components/responses/Problem'   # PRODUCT_OUT_OF_STOCK
+        '422':
+          $ref: '#/components/responses/ValidationProblem'
+
+  /api/v1/cart/items/{productId}:
+    patch:
+      tags: [Cart]
+      summary: 카트 수량 변경 (절대값)
+      parameters:
+        - { name: productId, in: path, required: true, schema: { type: string } }
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/CartQuantityRequest' }
+      responses:
+        '200': { $ref: '#/components/responses/Cart' }
+        '404':
+          $ref: '#/components/responses/Problem'   # CART_ITEM_NOT_FOUND
+        '409':
+          $ref: '#/components/responses/Problem'   # PRODUCT_OUT_OF_STOCK
+        '422':
+          $ref: '#/components/responses/ValidationProblem'
+    delete:
+      tags: [Cart]
+      summary: 카트 항목 삭제
+      parameters:
+        - { name: productId, in: path, required: true, schema: { type: string } }
+      responses:
+        '204': { description: No Content }
+        '404':
+          $ref: '#/components/responses/Problem'   # CART_ITEM_NOT_FOUND
+
+  # ───────────────────────── Address ─────────────────────────
+  /api/v1/addresses:
+    get:
+      tags: [Address]
+      summary: 내 주소 목록 (소량 — 페이지네이션 없음)
+      responses:
+        '200':
+          description: OK
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  items:
+                    type: array
+                    items: { $ref: '#/components/schemas/Address' }
+                required: [items]
+        '401': { $ref: '#/components/responses/Problem' }
+    post:
+      tags: [Address]
+      summary: 주소 추가
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/AddressCreateRequest' }
+      responses:
+        '201':
+          description: 생성됨
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/Address' }
+        '422':
+          $ref: '#/components/responses/ValidationProblem'
+
+  /api/v1/addresses/{id}:
+    patch:
+      tags: [Address]
+      summary: 주소 수정
+      parameters:
+        - $ref: '#/components/parameters/PathId'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/AddressUpdateRequest' }
+      responses:
+        '200':
+          description: OK
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/Address' }
+        '404':
+          $ref: '#/components/responses/Problem'   # ADDRESS_NOT_FOUND
+        '422':
+          $ref: '#/components/responses/ValidationProblem'
+    delete:
+      tags: [Address]
+      summary: 주소 삭제
+      parameters:
+        - $ref: '#/components/parameters/PathId'
+      responses:
+        '204': { description: No Content }
+        '404':
+          $ref: '#/components/responses/Problem'   # ADDRESS_NOT_FOUND
+
+  /api/v1/addresses/{id}/default:
+    post:
+      tags: [Address]
+      summary: 기본 주소 지정 (다른 주소 isDefault 자동 해제)
+      parameters:
+        - $ref: '#/components/parameters/PathId'
+      responses:
+        '200':
+          description: OK
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/Address' }
+        '404':
+          $ref: '#/components/responses/Problem'   # ADDRESS_NOT_FOUND
+
+  # ───────────────────────── Order ─────────────────────────
+  /api/v1/orders:
+    get:
+      tags: [Order]
+      summary: 내 주문내역 (최신순)
+      parameters:
+        - $ref: '#/components/parameters/Limit'
+        - $ref: '#/components/parameters/Offset'
+      responses:
+        '200':
+          description: OK
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  items:
+                    type: array
+                    items: { $ref: '#/components/schemas/OrderSummary' }
+                  page: { $ref: '#/components/schemas/Page' }
+                required: [items, page]
+        '401': { $ref: '#/components/responses/Problem' }
+    post:
+      tags: [Order]
+      summary: 주문 생성 (카트→주문, 멱등)
+      description: >
+        현재 카트 + 선택 배송지로 주문 생성. 상품·배송지 스냅샷 박제, 주문 시점 재고 재검증.
+        Idempotency-Key 정책: (userId, key) 고유, 같은 키+같은 본문은 최초 결과 재반환,
+        같은 키+다른 본문은 409 IDEMPOTENCY_KEY_CONFLICT, TTL 24h.
+      parameters:
+        - name: Idempotency-Key
+          in: header
+          required: true
+          schema: { type: string, format: uuid }
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/OrderCreateRequest' }
+      responses:
+        '201':
+          description: 생성됨 (status=PENDING)
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/Order' }
+        '400':
+          $ref: '#/components/responses/Problem'   # IDEMPOTENCY_KEY_REQUIRED
+        '404':
+          $ref: '#/components/responses/Problem'   # ADDRESS_NOT_FOUND
+        '409':
+          $ref: '#/components/responses/Problem'   # CART_EMPTY, PRODUCT_OUT_OF_STOCK, IDEMPOTENCY_KEY_CONFLICT
+
+  /api/v1/orders/{orderNumber}:
+    get:
+      tags: [Order]
+      summary: 주문 상세 (orderNumber로 조회)
+      parameters:
+        - $ref: '#/components/parameters/PathOrderNumber'
+      responses:
+        '200':
+          description: OK
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/Order' }
+        '404':
+          $ref: '#/components/responses/Problem'   # ORDER_NOT_FOUND (타인 주문 포함)
+
+  /api/v1/orders/{orderNumber}/pay:
+    post:
+      tags: [Order]
+      summary: 결제 시뮬레이션 (PENDING→PAID)
+      parameters:
+        - $ref: '#/components/parameters/PathOrderNumber'
+      responses:
+        '200':
+          description: OK
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/Order' }
+        '404':
+          $ref: '#/components/responses/Problem'   # ORDER_NOT_FOUND
+        '409':
+          $ref: '#/components/responses/Problem'   # ORDER_NOT_PENDING, ORDER_ALREADY_PAID
+
+  /api/v1/orders/{orderNumber}/cancel:
+    post:
+      tags: [Order]
+      summary: 주문 취소 (PENDING→CANCELED)
+      parameters:
+        - $ref: '#/components/parameters/PathOrderNumber'
+      responses:
+        '200':
+          description: OK
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/Order' }
+        '404':
+          $ref: '#/components/responses/Problem'   # ORDER_NOT_FOUND
+        '409':
+          $ref: '#/components/responses/Problem'   # ORDER_NOT_PENDING, ORDER_ALREADY_CANCELED
+
+  # ───────────────────────── Admin ─────────────────────────
+  /api/v1/admin/products:
+    get:
+      tags: [Admin]
+      summary: 관리자 상품 목록 (비활성 포함)
+      parameters:
+        - { name: q, in: query, schema: { type: string } }
+        - { name: isActive, in: query, schema: { type: boolean } }
+        - name: sort
+          in: query
+          schema: { type: string, enum: [latest, price_asc, price_desc], default: latest }
+        - $ref: '#/components/parameters/Limit'
+        - $ref: '#/components/parameters/Offset'
+      responses:
+        '200':
+          description: OK
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  items:
+                    type: array
+                    items: { $ref: '#/components/schemas/Product' }
+                  page: { $ref: '#/components/schemas/Page' }
+                required: [items, page]
+        '403': { $ref: '#/components/responses/Problem' }
+    post:
+      tags: [Admin]
+      summary: 상품 생성 (imageUrl 문자열)
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/ProductCreateRequest' }
+      responses:
+        '201':
+          description: 생성됨
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/Product' }
+        '403': { $ref: '#/components/responses/Problem' }
+        '422':
+          $ref: '#/components/responses/ValidationProblem'
+
+  /api/v1/admin/products/{id}:
+    get:
+      tags: [Admin]
+      summary: 관리자 상품 상세 (수정 진입용, 비활성 포함)
+      parameters:
+        - $ref: '#/components/parameters/PathId'
+      responses:
+        '200':
+          description: OK
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/Product' }
+        '404':
+          $ref: '#/components/responses/Problem'   # PRODUCT_NOT_FOUND
+    patch:
+      tags: [Admin]
+      summary: 상품 수정
+      parameters:
+        - $ref: '#/components/parameters/PathId'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/ProductUpdateRequest' }
+      responses:
+        '200':
+          description: OK
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/Product' }
+        '404':
+          $ref: '#/components/responses/Problem'   # PRODUCT_NOT_FOUND
+        '422':
+          $ref: '#/components/responses/ValidationProblem'
+    delete:
+      tags: [Admin]
+      summary: 상품 삭제 (soft delete — isActive=false)
+      parameters:
+        - $ref: '#/components/parameters/PathId'
+      responses:
+        '204': { description: No Content }
+        '404':
+          $ref: '#/components/responses/Problem'   # PRODUCT_NOT_FOUND
+
+  /api/v1/admin/orders:
+    get:
+      tags: [Admin]
+      summary: 전체 주문 조회
+      parameters:
+        - name: status
+          in: query
+          schema: { type: string, enum: [PENDING, PAID, CANCELED] }
+        - $ref: '#/components/parameters/Limit'
+        - $ref: '#/components/parameters/Offset'
+      responses:
+        '200':
+          description: OK
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  items:
+                    type: array
+                    items: { $ref: '#/components/schemas/AdminOrderSummary' }
+                  page: { $ref: '#/components/schemas/Page' }
+                required: [items, page]
+        '403': { $ref: '#/components/responses/Problem' }
+
+  # ───────────────────────── System ─────────────────────────
+  /health:
+    get:
+      tags: [System]
+      summary: 헬스체크 (DB ping, prefix 밖)
+      security: []
+      responses:
+        '200':
+          description: OK
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  status: { type: string, example: ok }
+                  db: { type: string, example: up }
+        '503':
+          description: DB down
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  status: { type: string, example: error }
+                  db: { type: string, example: down }
+
+components:
+  securitySchemes:
+    bearerAuth:
+      type: http
+      scheme: bearer
+      bearerFormat: JWT
+
+  parameters:
+    Limit:
+      name: limit
+      in: query
+      schema: { type: integer, minimum: 1, maximum: 100, default: 20 }
+    Offset:
+      name: offset
+      in: query
+      schema: { type: integer, minimum: 0, default: 0 }
+    PathId:
+      name: id
+      in: path
+      required: true
+      schema: { type: string }
+    PathOrderNumber:
+      name: orderNumber
+      in: path
+      required: true
+      schema: { type: string, example: ORD-20260601-0001 }
+
+  responses:
+    Problem:
+      description: 에러 (RFC 9457 Problem Details)
+      content:
+        application/problem+json:
+          schema: { $ref: '#/components/schemas/Problem' }
+    ValidationProblem:
+      description: 검증 실패 (422)
+      content:
+        application/problem+json:
+          schema: { $ref: '#/components/schemas/ValidationProblem' }
+    Cart:
+      description: OK
+      content:
+        application/json:
+          schema: { $ref: '#/components/schemas/Cart' }
+
+  schemas:
+    # ── 에러 ──
+    Problem:
+      type: object
+      description: RFC 9457 Problem Details + 안정적 code
+      properties:
+        type: { type: string, format: uri, example: 'https://goods-mall.local/problems/product-not-found' }
+        title: { type: string, example: Product not found }
+        status: { type: integer, example: 404 }
+        detail: { type: string, example: 상품을 찾을 수 없습니다. }
+        instance: { type: string, example: /api/v1/products/zzz }
+        code:
+          type: string
+          description: HTTP status와 독립적인 안정 문자열. 프런트는 이 값으로 분기.
+          example: PRODUCT_NOT_FOUND
+      required: [title, status, code]
+    ValidationProblem:
+      allOf:
+        - $ref: '#/components/schemas/Problem'
+        - type: object
+          properties:
+            errors:
+              type: array
+              items:
+                type: object
+                properties:
+                  field: { type: string, example: email }
+                  code: { type: string, example: INVALID_EMAIL }
+                  message: { type: string, example: 올바른 이메일 형식이 아닙니다. }
+                required: [field, code]
+
+    # ── 공통 ──
+    Page:
+      type: object
+      properties:
+        limit: { type: integer, example: 20 }
+        offset: { type: integer, example: 0 }
+        total: { type: integer, example: 137 }
+      required: [limit, offset, total]
+    User:
+      type: object
+      properties:
+        id: { type: string }
+        email: { type: string, format: email }
+        name: { type: string }
+        role: { type: string, enum: [USER, ADMIN] }
+        createdAt: { type: string, format: date-time }
+      required: [id, email, name, role, createdAt]
+    AuthResult:
+      type: object
+      properties:
+        user: { $ref: '#/components/schemas/User' }
+        accessToken: { type: string }
+        refreshToken: { type: string }
+      required: [user, accessToken, refreshToken]
+    TokenPair:
+      type: object
+      properties:
+        accessToken: { type: string }
+        refreshToken: { type: string }
+      required: [accessToken, refreshToken]
+
+    # ── Product ──
+    Product:
+      type: object
+      properties:
+        id: { type: string }
+        name: { type: string }
+        description: { type: string }
+        priceWon: { type: integer, minimum: 0, description: 원 단위 정수(KRW) }
+        stock: { type: integer, minimum: 0 }
+        imageUrl: { type: string }
+        isActive: { type: boolean }
+        createdAt: { type: string, format: date-time }
+        updatedAt: { type: string, format: date-time }
+      required: [id, name, description, priceWon, stock, imageUrl, isActive, createdAt, updatedAt]
+    ProductSummary:
+      type: object
+      properties:
+        id: { type: string }
+        name: { type: string }
+        priceWon: { type: integer, minimum: 0 }
+        stock: { type: integer, minimum: 0 }
+        imageUrl: { type: string }
+      required: [id, name, priceWon, stock, imageUrl]
+
+    # ── Cart ──
+    CartItem:
+      type: object
+      properties:
+        productId: { type: string }
+        productName: { type: string }
+        productImage: { type: string }
+        priceWon: { type: integer, minimum: 0 }
+        quantity: { type: integer, minimum: 1 }
+        subtotalWon: { type: integer, minimum: 0 }
+      required: [productId, productName, productImage, priceWon, quantity, subtotalWon]
+    Cart:
+      type: object
+      properties:
+        items:
+          type: array
+          items: { $ref: '#/components/schemas/CartItem' }
+        totalWon: { type: integer, minimum: 0 }
+      required: [items, totalWon]
+
+    # ── Address ──
+    Address:
+      type: object
+      properties:
+        id: { type: string }
+        label: { type: string }
+        recipientName: { type: string }
+        phone: { type: string }
+        zipCode: { type: string }
+        sido: { type: string }
+        sigungu: { type: string }
+        bname: { type: string }
+        roadName: { type: string }
+        detailAddress: { type: string }
+        isDefault: { type: boolean }
+        createdAt: { type: string, format: date-time }
+        updatedAt: { type: string, format: date-time }
+      required: [id, label, recipientName, phone, zipCode, sido, sigungu, bname, roadName, detailAddress, isDefault, createdAt, updatedAt]
+    AddressSnapshot:
+      type: object
+      properties:
+        recipientName: { type: string }
+        phone: { type: string }
+        zipCode: { type: string }
+        sido: { type: string }
+        sigungu: { type: string }
+        bname: { type: string }
+        roadName: { type: string }
+        detailAddress: { type: string }
+      required: [recipientName, phone, zipCode, sido, sigungu, bname, roadName, detailAddress]
+
+    # ── Order ──
+    OrderItem:
+      type: object
+      properties:
+        productId: { type: string }
+        productName: { type: string }
+        productPriceWon: { type: integer, minimum: 0 }
+        quantity: { type: integer, minimum: 1 }
+      required: [productId, productName, productPriceWon, quantity]
+    OrderSummary:
+      type: object
+      properties:
+        orderNumber: { type: string }
+        status: { type: string, enum: [PENDING, PAID, CANCELED] }
+        totalWon: { type: integer, minimum: 0 }
+        itemCount: { type: integer, minimum: 0 }
+        createdAt: { type: string, format: date-time }
+        paidAt: { type: [string, 'null'], format: date-time }
+      required: [orderNumber, status, totalWon, itemCount, createdAt]
+    Order:
+      type: object
+      properties:
+        orderNumber: { type: string, example: ORD-20260601-0001 }
+        status: { type: string, enum: [PENDING, PAID, CANCELED] }
+        totalWon: { type: integer, minimum: 0 }
+        recipient: { $ref: '#/components/schemas/AddressSnapshot' }
+        items:
+          type: array
+          items: { $ref: '#/components/schemas/OrderItem' }
+        createdAt: { type: string, format: date-time }
+        paidAt: { type: [string, 'null'], format: date-time }
+      required: [orderNumber, status, totalWon, recipient, items, createdAt]
+    AdminOrderSummary:
+      type: object
+      properties:
+        orderNumber: { type: string }
+        status: { type: string, enum: [PENDING, PAID, CANCELED] }
+        totalWon: { type: integer, minimum: 0 }
+        itemCount: { type: integer, minimum: 0 }
+        userId: { type: string }
+        createdAt: { type: string, format: date-time }
+        paidAt: { type: [string, 'null'], format: date-time }
+      required: [orderNumber, status, totalWon, itemCount, userId, createdAt]
+
+    # ── 요청 바디 ──
+    SignupRequest:
+      type: object
+      properties:
+        email: { type: string, format: email }
+        password: { type: string, minLength: 8 }
+        name: { type: string }
+      required: [email, password, name]
+    LoginRequest:
+      type: object
+      properties:
+        email: { type: string, format: email }
+        password: { type: string }
+      required: [email, password]
+    RefreshRequest:
+      type: object
+      properties:
+        refreshToken: { type: string }
+      required: [refreshToken]
+    LinkRequest:
+      type: object
+      properties:
+        pending: { type: string, description: pending_link JWT }
+        password: { type: string }
+      required: [pending, password]
+    CartAddRequest:
+      type: object
+      properties:
+        productId: { type: string }
+        quantity: { type: integer, minimum: 1 }
+      required: [productId, quantity]
+    CartQuantityRequest:
+      type: object
+      properties:
+        quantity: { type: integer, minimum: 1 }
+      required: [quantity]
+    AddressCreateRequest:
+      type: object
+      properties:
+        label: { type: string }
+        recipientName: { type: string }
+        phone: { type: string }
+        zipCode: { type: string }
+        sido: { type: string }
+        sigungu: { type: string }
+        bname: { type: string }
+        roadName: { type: string }
+        detailAddress: { type: string }
+        isDefault: { type: boolean, default: false }
+      required: [label, recipientName, phone, zipCode, sido, sigungu, bname, roadName, detailAddress]
+    AddressUpdateRequest:
+      type: object
+      description: 부분 수정 — 모든 필드 선택
+      properties:
+        label: { type: string }
+        recipientName: { type: string }
+        phone: { type: string }
+        zipCode: { type: string }
+        sido: { type: string }
+        sigungu: { type: string }
+        bname: { type: string }
+        roadName: { type: string }
+        detailAddress: { type: string }
+        isDefault: { type: boolean }
+    OrderCreateRequest:
+      type: object
+      properties:
+        addressId: { type: string, description: 저장된 배송지 id (스냅샷 출처) }
+      required: [addressId]
+    ProductCreateRequest:
+      type: object
+      properties:
+        name: { type: string }
+        description: { type: string }
+        priceWon: { type: integer, minimum: 0 }
+        stock: { type: integer, minimum: 0, default: 0 }
+        imageUrl: { type: string }
+        isActive: { type: boolean, default: true }
+      required: [name, description, priceWon, imageUrl]
+    ProductUpdateRequest:
+      type: object
+      description: 부분 수정 — 모든 필드 선택
+      properties:
+        name: { type: string }
+        description: { type: string }
+        priceWon: { type: integer, minimum: 0 }
+        stock: { type: integer, minimum: 0 }
+        imageUrl: { type: string }
+        isActive: { type: boolean }
