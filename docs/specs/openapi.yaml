@@ -234,6 +234,7 @@ paths:
             schema: { $ref: '#/components/schemas/CartAddRequest' }
       responses:
         '200': { $ref: '#/components/responses/Cart' }
+        '401': { $ref: '#/components/responses/Problem' }
         '404':
           $ref: '#/components/responses/Problem'   # PRODUCT_NOT_FOUND
         '409':
@@ -254,6 +255,7 @@ paths:
             schema: { $ref: '#/components/schemas/CartQuantityRequest' }
       responses:
         '200': { $ref: '#/components/responses/Cart' }
+        '401': { $ref: '#/components/responses/Problem' }
         '404':
           $ref: '#/components/responses/Problem'   # CART_ITEM_NOT_FOUND
         '409':
@@ -267,6 +269,7 @@ paths:
         - { name: productId, in: path, required: true, schema: { type: string } }
       responses:
         '204': { description: No Content }
+        '401': { $ref: '#/components/responses/Problem' }
         '404':
           $ref: '#/components/responses/Problem'   # CART_ITEM_NOT_FOUND
 
@@ -302,6 +305,7 @@ paths:
           content:
             application/json:
               schema: { $ref: '#/components/schemas/Address' }
+        '401': { $ref: '#/components/responses/Problem' }
         '422':
           $ref: '#/components/responses/ValidationProblem'
 
@@ -322,6 +326,7 @@ paths:
           content:
             application/json:
               schema: { $ref: '#/components/schemas/Address' }
+        '401': { $ref: '#/components/responses/Problem' }
         '404':
           $ref: '#/components/responses/Problem'   # ADDRESS_NOT_FOUND
         '422':
@@ -333,6 +338,7 @@ paths:
         - $ref: '#/components/parameters/PathId'
       responses:
         '204': { description: No Content }
+        '401': { $ref: '#/components/responses/Problem' }
         '404':
           $ref: '#/components/responses/Problem'   # ADDRESS_NOT_FOUND
 
@@ -348,6 +354,7 @@ paths:
           content:
             application/json:
               schema: { $ref: '#/components/schemas/Address' }
+        '401': { $ref: '#/components/responses/Problem' }
         '404':
           $ref: '#/components/responses/Problem'   # ADDRESS_NOT_FOUND
 
@@ -398,6 +405,7 @@ paths:
               schema: { $ref: '#/components/schemas/Order' }
         '400':
           $ref: '#/components/responses/Problem'   # IDEMPOTENCY_KEY_REQUIRED
+        '401': { $ref: '#/components/responses/Problem' }
         '404':
           $ref: '#/components/responses/Problem'   # ADDRESS_NOT_FOUND
         '409':
@@ -415,6 +423,7 @@ paths:
           content:
             application/json:
               schema: { $ref: '#/components/schemas/Order' }
+        '401': { $ref: '#/components/responses/Problem' }
         '404':
           $ref: '#/components/responses/Problem'   # ORDER_NOT_FOUND (타인 주문 포함)
 
@@ -430,6 +439,7 @@ paths:
           content:
             application/json:
               schema: { $ref: '#/components/schemas/Order' }
+        '401': { $ref: '#/components/responses/Problem' }
         '404':
           $ref: '#/components/responses/Problem'   # ORDER_NOT_FOUND
         '409':
@@ -447,6 +457,7 @@ paths:
           content:
             application/json:
               schema: { $ref: '#/components/schemas/Order' }
+        '401': { $ref: '#/components/responses/Problem' }
         '404':
           $ref: '#/components/responses/Problem'   # ORDER_NOT_FOUND
         '409':
@@ -478,6 +489,7 @@ paths:
                     items: { $ref: '#/components/schemas/Product' }
                   page: { $ref: '#/components/schemas/Page' }
                 required: [items, page]
+        '401': { $ref: '#/components/responses/Problem' }
         '403': { $ref: '#/components/responses/Problem' }
     post:
       tags: [Admin]
@@ -493,6 +505,7 @@ paths:
           content:
             application/json:
               schema: { $ref: '#/components/schemas/Product' }
+        '401': { $ref: '#/components/responses/Problem' }
         '403': { $ref: '#/components/responses/Problem' }
         '422':
           $ref: '#/components/responses/ValidationProblem'
@@ -509,6 +522,8 @@ paths:
           content:
             application/json:
               schema: { $ref: '#/components/schemas/Product' }
+        '401': { $ref: '#/components/responses/Problem' }
+        '403': { $ref: '#/components/responses/Problem' }
         '404':
           $ref: '#/components/responses/Problem'   # PRODUCT_NOT_FOUND
     patch:
@@ -527,6 +542,8 @@ paths:
           content:
             application/json:
               schema: { $ref: '#/components/schemas/Product' }
+        '401': { $ref: '#/components/responses/Problem' }
+        '403': { $ref: '#/components/responses/Problem' }
         '404':
           $ref: '#/components/responses/Problem'   # PRODUCT_NOT_FOUND
         '422':
@@ -538,6 +555,8 @@ paths:
         - $ref: '#/components/parameters/PathId'
       responses:
         '204': { description: No Content }
+        '401': { $ref: '#/components/responses/Problem' }
+        '403': { $ref: '#/components/responses/Problem' }
         '404':
           $ref: '#/components/responses/Problem'   # PRODUCT_NOT_FOUND
 
@@ -564,6 +583,7 @@ paths:
                     items: { $ref: '#/components/schemas/AdminOrderSummary' }
                   page: { $ref: '#/components/schemas/Page' }
                 required: [items, page]
+        '401': { $ref: '#/components/responses/Problem' }
         '403': { $ref: '#/components/responses/Problem' }
 
   # ───────────────────────── System ─────────────────────────
@@ -651,7 +671,7 @@ components:
           type: string
           description: HTTP status와 독립적인 안정 문자열. 프런트는 이 값으로 분기.
           example: PRODUCT_NOT_FOUND
-      required: [title, status, code]
+      required: [type, title, status, code]
     ValidationProblem:
       allOf:
         - $ref: '#/components/schemas/Problem'
