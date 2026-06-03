@@ -69,7 +69,7 @@
 - 계정 연결 (LOCAL + OAuth)
 - JwtAuthGuard / AdminGuard
 
-**구현 전제(공통 토대):** global prefix `/api/v1`, 전역 ValidationPipe→422, RFC 9457 ExceptionFilter, health 503. 자세히는 [HANDOFF.md §3](./HANDOFF.md).
+**구현 전제(공통 토대):** global prefix `/api/v1`, 전역 ValidationPipe→422, RFC 9457 ExceptionFilter, health 503. 자세히는 [slice-1-auth-plan.md](./slice-1-auth-plan.md) Phase A · [HANDOFF.md §2](./HANDOFF.md).
 
 **참고 문서:**
 - [foundation.md](./foundation.md)

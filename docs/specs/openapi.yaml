@@ -920,7 +920,7 @@ components:
       type: object
       description: RFC 9457 Problem Details + 안정적 code
       properties:
-        type: { type: string, format: uri, example: 'https://goods-mall.local/problems/product-not-found' }
+        type: { type: string, format: uri, example: 'https://docs.goods-mall.dev/errors/PRODUCT_NOT_FOUND' }
         title: { type: string, example: Product not found }
         status: { type: integer, example: 404 }
         detail: { type: string, example: 상품을 찾을 수 없습니다. }
