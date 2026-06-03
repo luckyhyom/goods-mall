@@ -70,6 +70,16 @@ export class AuthService {
     return this.buildResult(user);
   }
 
+  /** access 토큰 검증 후 현재 사용자 프로필 조회(/auth/me). */
+  async getMe(userId: string): Promise<PublicUser> {
+    const user = await this.prisma.user.findUnique({ where: { id: userId } });
+    if (!user) {
+      // 토큰은 유효하나 계정이 사라진 경우
+      throw new AppException('UNAUTHORIZED');
+    }
+    return toPublicUser(user);
+  }
+
   private async buildResult(user: UserRow): Promise<AuthResult> {
     const pair = await this.tokens.issueTokenPair({
       id: user.id,

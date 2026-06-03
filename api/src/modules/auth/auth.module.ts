@@ -3,6 +3,8 @@ import { JwtModule } from '@nestjs/jwt';
 import { TokenService } from './token.service';
 import { AuthService } from './auth.service';
 import { AuthController } from './auth.controller';
+import { JwtAuthGuard } from './guards/jwt-auth.guard';
+import { AdminGuard } from './guards/admin.guard';
 
 /**
  * 인증 모듈. 토큰 발급/검증의 단일 책임자(TokenService)를 제공한다.
@@ -12,7 +14,8 @@ import { AuthController } from './auth.controller';
 @Module({
   imports: [JwtModule.register({})],
   controllers: [AuthController],
-  providers: [TokenService, AuthService],
-  exports: [TokenService],
+  providers: [TokenService, AuthService, JwtAuthGuard, AdminGuard],
+  // 다른 슬라이스가 보호 엔드포인트에 재사용
+  exports: [TokenService, JwtAuthGuard, AdminGuard, JwtModule],
 })
 export class AuthModule {}
