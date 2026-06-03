@@ -54,7 +54,7 @@
 HTTP/1.1 404 Not Found
 Content-Type: application/problem+json
 {
-  "type": "https://goods-mall.local/problems/product-not-found",
+  "type": "https://docs.goods-mall.dev/errors/PRODUCT_NOT_FOUND",
   "title": "Product not found",
   "status": 404,
   "detail": "상품을 찾을 수 없습니다.",
@@ -64,7 +64,7 @@ Content-Type: application/problem+json
 ```
 
 - `code` — HTTP status와 **독립적인 안정 문자열**. 프런트는 메시지(`detail`)가 아니라 **`code`로 분기**한다.
-- `type` — 에러 종류 식별용 URI. `goods-mall.local` 호스트는 실제 접속용이 아닌 **문서용 안정 식별자**(로컬 MVP placeholder).
+- `type` — 에러 종류 식별용 URI. 형식은 `https://docs.goods-mall.dev/errors/<CODE>` (에러 카탈로그 문서 페이지를 가리키는 안정 식별자). 구현은 [errors/catalog.json](./errors/catalog.json)의 `baseUrl`을 단일 출처로 사용.
 - `title` — 사람이 읽는 짧은 요약(불변), `detail` — 상황별 메시지(가변).
 
 #### 검증 에러 (422)
@@ -74,7 +74,7 @@ Content-Type: application/problem+json
 ```jsonc
 HTTP/1.1 422 Unprocessable Entity
 {
-  "type": "https://goods-mall.local/problems/validation-error",
+  "type": "https://docs.goods-mall.dev/errors/VALIDATION_ERROR",
   "title": "Validation failed",
   "status": 422,
   "code": "VALIDATION_ERROR",
