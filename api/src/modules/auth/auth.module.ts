@@ -1,6 +1,8 @@
 import { Module } from '@nestjs/common';
 import { JwtModule } from '@nestjs/jwt';
 import { TokenService } from './token.service';
+import { AuthService } from './auth.service';
+import { AuthController } from './auth.controller';
 
 /**
  * 인증 모듈. 토큰 발급/검증의 단일 책임자(TokenService)를 제공한다.
@@ -9,7 +11,8 @@ import { TokenService } from './token.service';
  */
 @Module({
   imports: [JwtModule.register({})],
-  providers: [TokenService],
+  controllers: [AuthController],
+  providers: [TokenService, AuthService],
   exports: [TokenService],
 })
 export class AuthModule {}
