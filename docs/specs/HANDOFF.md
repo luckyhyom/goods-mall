@@ -11,7 +11,7 @@
 - **API 계약 설계 완료** — [api-spec.md](./api-spec.md) / [openapi.yaml](./openapi.yaml) / [errors/](./errors/)
 - **Slice 1 (Auth) — Phase A·B 완료, Phase C(OAuth) 남음**
   - 계획: [slice-1-auth-plan.md](./slice-1-auth-plan.md)
-  - 빌드 클린, 테스트 15/15 통과
+  - **코드 리뷰 1차 반영 완료** (6건 수정, 아래 §7). 빌드 클린, 테스트 **17/17** 통과
 - **프런트엔드 별도 레포** — 이 레포는 백엔드 API 전용
 
 ## 2. Slice 1에서 지금까지 구현된 것 (코드 존재)
@@ -54,8 +54,8 @@
 - **logout-revoke vs rotation-revoke 미구분:** logout으로 revoke된 토큰을 다시 제시하면
   "재사용"으로 간주돼 패밀리 전체가 무효화된다. 보안상 안전한 기본값이나, 정상 로그아웃 후
   stale 탭이 모든 세션을 날릴 수 있음. 구분 필요 시 RefreshToken에 revoke 사유 컬럼 추가 검토.
-- **api-spec.md `type` URL 정정 완료:** 옛 `goods-mall.local/problems/*` → 실제 계약인
-  `https://docs.goods-mall.dev/errors/<CODE>`로 수정함(openapi.yaml·catalog.json과 일치).
+- **`type` URL 정정 완료:** 옛 `goods-mall.local/problems/*` → 실제 계약인
+  `https://docs.goods-mall.dev/errors/<CODE>`. api-spec.md·openapi.yaml 모두 수정됨(catalog.json과 일치).
 - **User 역참조 관계:** `addresses/cartItems/orders`는 각 슬라이스에서 추가(현재 생략). `OrderStatus` enum도 Order 슬라이스에서.
 - **`IdempotencyKey` 모델:** 주문(Slice 5) 전까지 `data-model.md`에 추가 필요.
 
@@ -83,3 +83,17 @@ python3 -m http.server 8080
 #  http://localhost:8080/swagger.html       ← API
 #  http://localhost:8080/errors/index.html  ← 에러 카탈로그
 ```
+
+## 7. 코드 리뷰 1차 반영 (2026-06-04, Phase B 후)
+
+외부 리뷰 6건 모두 검증 후 수정 완료(원자적 커밋). 다음 작업 시 같은 패턴 주의:
+- **bcrypt 유령 의존성** → `api/package.json`에 명시(`278dfcb`). `npm install`은 반드시
+  `api/`에서 — cwd가 상위면 상위 `package.json`에 깔린다(모듈 해석이 상위로 올라가 가려짐).
+- **refresh rotation 경합** → 조건부 `updateMany(id, revokedAt:null)` 원자적 claim(`648cb4c`).
+  새 코드도 "확인 후 수정" 2-step 대신 조건부 update로 동시성 보장할 것.
+- **signup P2002** → create를 try/catch로 감싸 unique 위반을 409로(`aee458e`).
+- **ExceptionFilter 상태코드 보존** → 매핑 안 된 HttpException/`status` 보유 에러(body-parser
+  malformed JSON 등)를 500으로 떨구지 않고 상태코드 보존, 카탈로그 없으면 `about:blank`(`6cd6dae`).
+- **문서 동기화** → openapi.yaml `type` 예시, roadmap 포인터 정정(`113bd51`).
+
+남은 후속(미수정, 검토만): §4의 **logout-revoke vs rotation-revoke 구분**.
