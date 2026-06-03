@@ -76,10 +76,19 @@ export class TokenService {
       throw new AppException('AUTH_TOKEN_EXPIRED');
     }
 
-    await this.prisma.refreshToken.update({
-      where: { id: record.id },
+    // 원자적 claim: revokedAt이 여전히 null일 때만 revoke. 동시 rotate 시
+    // 한 요청만 count=1을 얻고, 진 요청은 count=0 → 재사용으로 간주(1회용 보장).
+    const claimed = await this.prisma.refreshToken.updateMany({
+      where: { id: record.id, revokedAt: null },
       data: { revokedAt: new Date() },
     });
+    if (claimed.count === 0) {
+      await this.prisma.refreshToken.updateMany({
+        where: { userId: record.userId, revokedAt: null },
+        data: { revokedAt: new Date() },
+      });
+      throw new AppException('AUTH_REFRESH_REUSED');
+    }
 
     return this.issueTokenPair({
       id: record.user.id,

@@ -29,7 +29,7 @@ describe('TokenService', () => {
         findUnique: jest.fn(),
         create: jest.fn().mockResolvedValue({}),
         update: jest.fn().mockResolvedValue({}),
-        updateMany: jest.fn().mockResolvedValue({ count: 0 }),
+        updateMany: jest.fn().mockResolvedValue({ count: 1 }),
       },
     };
     jwt = { signAsync: jest.fn().mockResolvedValue('access.jwt') };
@@ -96,7 +96,7 @@ describe('TokenService', () => {
       );
     });
 
-    it('정상 refresh → 기존 토큰 revoke 후 새 쌍 발급', async () => {
+    it('정상 refresh → 기존 토큰을 원자적으로 claim(revoke) 후 새 쌍 발급', async () => {
       prisma.refreshToken.findUnique.mockResolvedValue({
         id: 't1',
         userId: 'u1',
@@ -104,18 +104,42 @@ describe('TokenService', () => {
         expiresAt: new Date(Date.now() + 100000),
         user,
       });
+      prisma.refreshToken.updateMany.mockResolvedValue({ count: 1 });
 
       const pair = await service.rotate('x');
 
-      expect(prisma.refreshToken.update).toHaveBeenCalledWith(
+      // 조건부 updateMany(revokedAt:null)로 1회용 보장 — 동시성 안전
+      expect(prisma.refreshToken.updateMany).toHaveBeenCalledWith(
         expect.objectContaining({
-          where: { id: 't1' },
+          where: { id: 't1', revokedAt: null },
           data: expect.objectContaining({ revokedAt: expect.any(Date) }),
         }),
       );
       expect(prisma.refreshToken.create).toHaveBeenCalledTimes(1);
       expect(pair.accessToken).toBe('access.jwt');
       expect(pair.refreshToken).toEqual(expect.any(String));
+    });
+
+    it('동시 rotate로 claim 실패(count 0) → 재사용 간주: 패밀리 무효화 + AUTH_REFRESH_REUSED', async () => {
+      prisma.refreshToken.findUnique.mockResolvedValue({
+        id: 't1',
+        userId: 'u1',
+        revokedAt: null,
+        expiresAt: new Date(Date.now() + 100000),
+        user,
+      });
+      // 다른 동시 요청이 먼저 claim → 이 요청의 조건부 update는 0건
+      prisma.refreshToken.updateMany
+        .mockResolvedValueOnce({ count: 0 }) // claim 실패
+        .mockResolvedValueOnce({ count: 2 }); // 패밀리 무효화
+
+      await expect(service.rotate('x')).rejects.toMatchObject({
+        code: 'AUTH_REFRESH_REUSED',
+      });
+      expect(prisma.refreshToken.updateMany).toHaveBeenLastCalledWith(
+        expect.objectContaining({ where: { userId: 'u1', revokedAt: null } }),
+      );
+      expect(prisma.refreshToken.create).not.toHaveBeenCalled();
     });
   });
 
