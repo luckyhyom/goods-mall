@@ -12,3 +12,6 @@ dist/
 
 # Prisma 생성 클라이언트 (prisma generate로 재생성)
 /src/generated
+
+# 에러 카탈로그 동기화 생성물 (npm run sync:errors로 재생성)
+/src/common/errors/error-catalog.generated.ts
