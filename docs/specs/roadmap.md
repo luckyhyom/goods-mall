@@ -5,6 +5,9 @@
 >
 > **범위:** 백엔드 API 전용. 각 슬라이스는 도메인별 API 절단면을 완성한다.
 > 프런트엔드(화면)는 별도 레포에서 이 API를 소비한다.
+>
+> **새 세션은 [HANDOFF.md](./HANDOFF.md)부터 읽으세요** — 현재 상태·다음 작업·재개 프롬프트 정리.
+> API 계약은 [api-spec.md](./api-spec.md) / [openapi.yaml](./openapi.yaml) / [errors/](./errors/).
 
 ---
 
@@ -66,8 +69,11 @@
 - 계정 연결 (LOCAL + OAuth)
 - JwtAuthGuard / AdminGuard
 
+**구현 전제(공통 토대):** global prefix `/api/v1`, 전역 ValidationPipe→422, RFC 9457 ExceptionFilter, health 503. 자세히는 [HANDOFF.md §3](./HANDOFF.md).
+
 **참고 문서:**
 - [foundation.md](./foundation.md)
+- [api-spec.md](./api-spec.md) (§1 공통 규약, §3 Auth)
 - [auth-strategy.md](./auth-strategy.md)
 - [data-model.md ## User & OAuthAccount & RefreshToken](./data-model.md#user--oauthaccount--refreshtoken)
 
