@@ -27,6 +27,13 @@ interface UserRow extends PublicUser {
   passwordHash: string | null;
 }
 
+/** Prisma 고유 제약 위반(P2002) 여부 — 클래스 import 결합 없이 duck-typing */
+const isUniqueViolation = (err: unknown): boolean =>
+  typeof err === 'object' &&
+  err !== null &&
+  'code' in err &&
+  (err as { code?: unknown }).code === 'P2002';
+
 const toPublicUser = (u: UserRow): PublicUser => ({
   id: u.id,
   email: u.email,
@@ -48,10 +55,18 @@ export class AuthService {
       throw new AppException('AUTH_EMAIL_TAKEN');
     }
     const passwordHash = await bcrypt.hash(password, BCRYPT_ROUNDS);
-    const user = await this.prisma.user.create({
-      data: { email, name, passwordHash },
-    });
-    return this.buildResult(user);
+    try {
+      const user = await this.prisma.user.create({
+        data: { email, name, passwordHash },
+      });
+      return this.buildResult(user);
+    } catch (err) {
+      // 사전 체크와 create 사이 동시 가입(unique 위반) → 409로 정규화
+      if (isUniqueViolation(err)) {
+        throw new AppException('AUTH_EMAIL_TAKEN');
+      }
+      throw err;
+    }
   }
 
   async login({ email, password }: LoginDto): Promise<AuthResult> {

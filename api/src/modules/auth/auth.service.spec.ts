@@ -72,6 +72,14 @@ describe('AuthService', () => {
       ).rejects.toMatchObject({ code: 'AUTH_EMAIL_TAKEN' });
       expect(prisma.user.create).not.toHaveBeenCalled();
     });
+
+    it('체크 통과 후 동시 가입으로 create가 P2002 → AUTH_EMAIL_TAKEN(409)', async () => {
+      prisma.user.findUnique.mockResolvedValue(null);
+      prisma.user.create.mockRejectedValue({ code: 'P2002' });
+      await expect(
+        service.signup({ email: 'a@b.com', password: 'pw12345678', name: 'x' }),
+      ).rejects.toMatchObject({ code: 'AUTH_EMAIL_TAKEN' });
+    });
   });
 
   describe('login', () => {
