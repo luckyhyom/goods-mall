@@ -8,3 +8,50 @@ generator client {
 datasource db {
   provider = "mysql"
 }
+
+enum Role {
+  USER
+  ADMIN
+}
+
+enum OAuthProvider {
+  GOOGLE
+  // 확장 시 KAKAO, NAVER 등
+}
+
+model User {
+  id           String   @id @default(cuid())
+  email        String   @unique
+  passwordHash String? // null이면 LOCAL 로그인 비활성 (OAuth 전용)
+  name         String
+  role         Role     @default(USER)
+  createdAt    DateTime @default(now())
+
+  oauthAccounts OAuthAccount[]
+  refreshTokens RefreshToken[]
+  // addresses / cartItems / orders 역참조는 각 슬라이스에서 추가
+}
+
+model OAuthAccount {
+  id         String        @id @default(cuid())
+  userId     String
+  user       User          @relation(fields: [userId], references: [id], onDelete: Cascade)
+  provider   OAuthProvider
+  providerId String // Google sub 등
+  createdAt  DateTime      @default(now())
+
+  @@unique([provider, providerId]) // 같은 외부 계정이 두 User에 매핑 안 됨
+  @@unique([userId, provider]) // 한 User당 한 provider 1개
+}
+
+model RefreshToken {
+  id        String    @id @default(cuid())
+  userId    String
+  user      User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+  tokenHash String    @unique // 평문 refresh의 sha256
+  expiresAt DateTime
+  revokedAt DateTime? // 사용/무효화 시점 (rotation에서 재사용 감지용)
+  createdAt DateTime  @default(now())
+
+  @@index([userId])
+}
