@@ -22,9 +22,12 @@ async function main(): Promise<void> {
   });
   try {
     const passwordHash = await bcrypt.hash(password, 12);
+    // seed의 목적은 "초기 관리자 보장". 같은 이메일의 기존 계정이 있더라도
+    // role뿐 아니라 passwordHash도 env 값으로 맞춰, 기존 비번이 그대로 관리자
+    // 권한을 얻는 권한 상승 surprise를 막는다(매 실행이 선언적 desired state).
     const admin = await prisma.user.upsert({
       where: { email },
-      update: { role: 'ADMIN' },
+      update: { role: 'ADMIN', passwordHash },
       create: { email, name: 'Admin', passwordHash, role: 'ADMIN' },
     });
     console.log(`[seed] ADMIN 준비 완료: ${admin.email} (${admin.id})`);
