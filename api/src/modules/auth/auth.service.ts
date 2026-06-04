@@ -149,8 +149,13 @@ export class AuthService {
     const existing = await this.prisma.user.findUnique({
       where: { email: profile.email },
     });
-    if (!existing) {
-      // 신규 가입: 로컬 비번 없이 OAuth만으로 생성(한 트랜잭션에서 연결)
+    if (existing) {
+      // 기존 로컬 계정 존재 → 자동 연결하지 않고 패스워드 확인을 요구
+      return this.pendingLink(profile);
+    }
+
+    // 신규 가입: 로컬 비번 없이 OAuth만으로 생성(한 트랜잭션에서 연결)
+    try {
       const created = await this.prisma.user.create({
         data: {
           email: profile.email,
@@ -162,9 +167,35 @@ export class AuthService {
         },
       });
       return { kind: 'authenticated', result: await this.buildResult(created) };
+    } catch (err) {
+      if (!isUniqueViolation(err)) {
+        throw err;
+      }
+      // 조회와 생성 사이의 경쟁(동시 OAuth 로그인 또는 로컬 signup) → 분기 재평가:
+      // 같은 OAuthAccount가 이미 생겼으면 그 User로 로그인, 아니면(email만 선점) 연결 필요.
+      const raced = await this.prisma.oAuthAccount.findUnique({
+        where: {
+          provider_providerId: {
+            provider: 'GOOGLE',
+            providerId: profile.providerId,
+          },
+        },
+        include: { user: true },
+      });
+      if (raced) {
+        return {
+          kind: 'authenticated',
+          result: await this.buildResult(raced.user),
+        };
+      }
+      return this.pendingLink(profile);
     }
+  }
 
-    // 기존 로컬 계정 존재 → 자동 연결하지 않고 패스워드 확인을 요구
+  /** 연결 필요 분기: 기존 계정과 묶기 위한 pending_link JWT 발급. */
+  private async pendingLink(
+    profile: GoogleProfile,
+  ): Promise<GoogleAuthOutcome> {
     const pendingToken = await this.jwt.signAsync(
       {
         email: profile.email,

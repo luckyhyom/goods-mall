@@ -252,6 +252,50 @@ describe('AuthService (Phase C)', () => {
       // 연결은 사용자 확인이 필요하므로 토큰을 바로 발급하지 않음
       expect(tokens.issueTokenPair).not.toHaveBeenCalled();
     });
+
+    it('신규 생성 중 동시 OAuth 로그인으로 P2002 → 재조회 후 로그인(authenticated)', async () => {
+      // 초기 조회는 없음 → create 시도 → 그 사이 다른 요청이 같은 OAuthAccount 생성(P2002)
+      prisma.oAuthAccount.findUnique
+        .mockResolvedValueOnce(null)
+        .mockResolvedValueOnce({
+          user: {
+            id: 'u-raced',
+            email: 'g@user.com',
+            name: 'G User',
+            role: 'USER',
+            createdAt: new Date(),
+            passwordHash: null,
+          },
+        });
+      prisma.user.findUnique.mockResolvedValue(null);
+      prisma.user.create.mockRejectedValue({ code: 'P2002' });
+
+      const out = await service.handleGoogleLogin(profile);
+
+      expect(out.kind).toBe('authenticated');
+      if (out.kind !== 'authenticated') throw new Error('unreachable');
+      expect(out.result.user.id).toBe('u-raced');
+    });
+
+    it('신규 생성 중 동시 로컬 signup으로 P2002(email 충돌) → 연결 필요(pending)', async () => {
+      // create가 User.email unique 위반 → 재조회 시 OAuthAccount는 여전히 없음 → 연결 분기
+      prisma.oAuthAccount.findUnique.mockResolvedValue(null);
+      prisma.user.findUnique.mockResolvedValue(null);
+      prisma.user.create.mockRejectedValue({ code: 'P2002' });
+
+      const out = await service.handleGoogleLogin(profile);
+
+      expect(out).toMatchObject({ kind: 'pending', pendingToken: 'pending.jwt' });
+      expect(tokens.issueTokenPair).not.toHaveBeenCalled();
+    });
+
+    it('create가 P2002가 아닌 에러면 그대로 전파', async () => {
+      prisma.oAuthAccount.findUnique.mockResolvedValue(null);
+      prisma.user.findUnique.mockResolvedValue(null);
+      prisma.user.create.mockRejectedValue(new Error('db down'));
+
+      await expect(service.handleGoogleLogin(profile)).rejects.toThrow('db down');
+    });
   });
 
   describe('link', () => {
