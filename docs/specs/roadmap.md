@@ -17,10 +17,10 @@
   - [x] Plan 작성 (`slice-0-bootstrap-plan.md`)
   - [x] 구현
   - [x] 회고
-- [ ] **Slice 1 — Auth** (로컬 인증 완료, OAuth 남음)
+- [x] **Slice 1 — Auth**
   - [x] Plan 작성 (`slice-1-auth-plan.md`)
-  - [~] 구현 — Phase A(공통 토대)·B(로컬 인증: signup/login/refresh/logout/me + 가드) 완료. Phase C(Google OAuth·계정연결·admin seed) 남음
-  - [ ] 회고 (Phase C 후)
+  - [x] 구현 — Phase A(공통 토대)·B(로컬 인증)·C(Google OAuth·계정연결·admin seed)·D(검증) 완료
+  - [x] 회고 (코드 리뷰 1·2차 반영, HANDOFF §7·§8)
 - [ ] **Slice 2 — Catalog**
   - [ ] Plan 작성 (`slice-2-catalog-plan.md`)
   - [ ] 구현
@@ -79,9 +79,10 @@
 
 **Plan:** [slice-1-auth-plan.md](./slice-1-auth-plan.md)
 
-**진행:** Phase A(prefix·422·RFC9457·health503)·B(로컬 인증 전체) 완료, 빌드/테스트 통과.
-남은 Phase C(Google OAuth·계정연결·admin seed)는 `GOOGLE_CLIENT_ID/SECRET` 자격증명
-확보 후 진행. 상세는 [HANDOFF.md](./HANDOFF.md).
+**진행:** ✅ 완료. Phase A(prefix·422·RFC9457·health503)·B(로컬 인증 전체)·C(Google
+OAuth·계정연결·admin seed)·D(검증) 모두 완료, 빌드/테스트(32) 통과. 외부 코드 리뷰
+1·2차 반영 완료(자세히는 [HANDOFF.md](./HANDOFF.md) §7·§8). end-to-end OAuth 실검증은
+실 `GOOGLE_CLIENT_ID/SECRET` 확보 시 가능(분기 로직은 단위 테스트로 검증됨).
 
 ---
 
