@@ -5,6 +5,7 @@ import { TokenService } from './token.service';
 import { AuthService } from './auth.service';
 import { AuthController } from './auth.controller';
 import { GoogleStrategy } from './strategies/google.strategy';
+import { GoogleCallbackGuard } from './guards/google-callback.guard';
 import { JwtAuthGuard } from './guards/jwt-auth.guard';
 import { AdminGuard } from './guards/admin.guard';
 
@@ -20,6 +21,7 @@ import { AdminGuard } from './guards/admin.guard';
     TokenService,
     AuthService,
     GoogleStrategy,
+    GoogleCallbackGuard,
     JwtAuthGuard,
     AdminGuard,
   ],

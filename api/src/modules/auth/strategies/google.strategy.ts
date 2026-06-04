@@ -3,10 +3,12 @@ import { PassportStrategy } from '@nestjs/passport';
 import {
   Strategy,
   type Profile,
+  type StrategyOptions,
   type VerifyCallback,
 } from 'passport-google-oauth20';
 import { AppException } from '../../../common/errors/app.exception';
 import type { GoogleProfile } from '../auth.service';
+import { CookieStateStore } from './cookie-state.store';
 
 /**
  * Google OAuth 전략 — 의도적으로 얇게 유지한다.
@@ -22,7 +24,10 @@ export class GoogleStrategy extends PassportStrategy(Strategy, 'google') {
       clientSecret: process.env.GOOGLE_CLIENT_SECRET as string,
       callbackURL: process.env.GOOGLE_CALLBACK_URL as string,
       scope: ['email', 'profile'],
-    });
+      // 세션 없는 CSRF 방어: state nonce를 쿠키로 관리(RFC 9700 §4.7).
+      // store는 passport-oauth2 옵션이라 google 타입에 없어 캐스팅한다.
+      store: new CookieStateStore(),
+    } as unknown as StrategyOptions);
   }
 
   validate(

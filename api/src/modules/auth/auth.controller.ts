@@ -18,6 +18,11 @@ import { LoginDto } from './dto/login.dto';
 import { RefreshDto } from './dto/refresh.dto';
 import { LinkDto } from './dto/link.dto';
 import { JwtAuthGuard, type JwtPayload } from './guards/jwt-auth.guard';
+import {
+  GoogleCallbackGuard,
+  OAUTH_FAILED,
+  type OAuthFailure,
+} from './guards/google-callback.guard';
 import { CurrentUser } from './decorators/current-user.decorator';
 
 @Controller('auth')
@@ -68,14 +73,21 @@ export class AuthController {
    * 토큰을 URL fragment로 전달하는 이유는 auth-strategy §5 참고(서버·referer 미전송).
    */
   @Get('google/callback')
-  @UseGuards(AuthGuard('google'))
+  @UseGuards(GoogleCallbackGuard)
   async googleCallback(
     @Req() req: Request,
     @Res() res: Response,
   ): Promise<void> {
-    const profile = req.user as GoogleProfile;
-    const outcome = await this.auth.handleGoogleLogin(profile);
+    const user = req.user as GoogleProfile | OAuthFailure;
     const base = process.env.WEB_BASE_URL ?? '';
+
+    // state 불일치·미검증 이메일 등 인증 실패 → 프런트 에러 페이지로 redirect
+    if (OAUTH_FAILED in user) {
+      res.redirect(`${base}/auth/oauth-error`);
+      return;
+    }
+
+    const outcome = await this.auth.handleGoogleLogin(user);
 
     if (outcome.kind === 'authenticated') {
       const { accessToken, refreshToken } = outcome.result;
