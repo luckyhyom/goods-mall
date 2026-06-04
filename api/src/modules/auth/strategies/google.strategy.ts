@@ -31,16 +31,18 @@ export class GoogleStrategy extends PassportStrategy(Strategy, 'google') {
     profile: Profile,
     done: VerifyCallback,
   ): void {
-    const email = profile.emails?.[0]?.value;
-    if (!email) {
-      // email 스코프 동의 거부 등 — 로그인 진행 불가
+    const primary = profile.emails?.[0];
+    // 미검증 이메일은 계정 선점(account pre-emption) 위험이 있으므로,
+    // Google이 소유를 검증한(email_verified=true) 이메일만 계정 키로 수락한다.
+    if (!primary?.value || primary.verified !== true) {
+      // email 스코프 거부 또는 미검증 — 로그인 진행 불가
       done(new AppException('UNAUTHORIZED'), false);
       return;
     }
     const result: GoogleProfile = {
       providerId: profile.id,
-      email,
-      name: profile.displayName ?? email,
+      email: primary.value,
+      name: profile.displayName ?? primary.value,
     };
     done(null, result);
   }
