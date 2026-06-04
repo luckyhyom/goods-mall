@@ -5,13 +5,18 @@ import {
   HttpCode,
   HttpStatus,
   Post,
+  Req,
+  Res,
   UseGuards,
 } from '@nestjs/common';
-import { AuthService } from './auth.service';
+import { AuthGuard } from '@nestjs/passport';
+import type { Request, Response } from 'express';
+import { AuthService, type GoogleProfile } from './auth.service';
 import { TokenService } from './token.service';
 import { SignupDto } from './dto/signup.dto';
 import { LoginDto } from './dto/login.dto';
 import { RefreshDto } from './dto/refresh.dto';
+import { LinkDto } from './dto/link.dto';
 import { JwtAuthGuard, type JwtPayload } from './guards/jwt-auth.guard';
 import { CurrentUser } from './decorators/current-user.decorator';
 
@@ -49,5 +54,45 @@ export class AuthController {
   @UseGuards(JwtAuthGuard)
   async me(@CurrentUser() user: JwtPayload) {
     return { user: await this.auth.getMe(user.sub) };
+  }
+
+  /** Google 인증 페이지로 302 리디렉트 (가드가 처리, 핸들러 바디는 비움). */
+  @Get('google')
+  @UseGuards(AuthGuard('google'))
+  googleAuth(): void {
+    // passport-google가 인증 페이지로 리다이렉트
+  }
+
+  /**
+   * Google 콜백. 분기 결과에 따라 fragment(로그인) 또는 ?pending(연결) redirect.
+   * 토큰을 URL fragment로 전달하는 이유는 auth-strategy §5 참고(서버·referer 미전송).
+   */
+  @Get('google/callback')
+  @UseGuards(AuthGuard('google'))
+  async googleCallback(
+    @Req() req: Request,
+    @Res() res: Response,
+  ): Promise<void> {
+    const profile = req.user as GoogleProfile;
+    const outcome = await this.auth.handleGoogleLogin(profile);
+    const base = process.env.WEB_BASE_URL ?? '';
+
+    if (outcome.kind === 'authenticated') {
+      const { accessToken, refreshToken } = outcome.result;
+      res.redirect(
+        `${base}/auth/oauth-success#accessToken=${accessToken}&refreshToken=${refreshToken}`,
+      );
+      return;
+    }
+    res.redirect(
+      `${base}/auth/link?pending=${encodeURIComponent(outcome.pendingToken)}`,
+    );
+  }
+
+  /** LOCAL 계정에 OAuth 연결 — pending JWT + 기존 패스워드 확인. */
+  @Post('link')
+  @HttpCode(HttpStatus.OK)
+  link(@Body() dto: LinkDto) {
+    return this.auth.link(dto);
   }
 }
