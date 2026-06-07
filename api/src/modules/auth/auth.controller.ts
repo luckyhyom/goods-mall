@@ -11,8 +11,11 @@ import {
 } from '@nestjs/common';
 import { AuthGuard } from '@nestjs/passport';
 import type { Request, Response } from 'express';
-import { AuthService, type GoogleProfile } from './auth.service';
+import { LocalAuthService } from './services/local-auth.service';
+import { OAuthLinkService } from './services/oauth-link.service';
+import { UserService } from './services/user.service';
 import { TokenService } from './token.service';
+import type { GoogleProfile } from './auth.types';
 import { SignupDto } from './dto/signup.dto';
 import { LoginDto } from './dto/login.dto';
 import { RefreshDto } from './dto/refresh.dto';
@@ -28,19 +31,21 @@ import { CurrentUser } from './decorators/current-user.decorator';
 @Controller('auth')
 export class AuthController {
   constructor(
-    private readonly auth: AuthService,
+    private readonly localAuth: LocalAuthService,
+    private readonly oauth: OAuthLinkService,
+    private readonly users: UserService,
     private readonly tokens: TokenService,
   ) {}
 
   @Post('signup')
   signup(@Body() dto: SignupDto) {
-    return this.auth.signup(dto); // 201 (POST 기본)
+    return this.localAuth.signup(dto); // 201 (POST 기본)
   }
 
   @Post('login')
   @HttpCode(HttpStatus.OK)
   login(@Body() dto: LoginDto) {
-    return this.auth.login(dto);
+    return this.localAuth.login(dto);
   }
 
   @Post('refresh')
@@ -58,7 +63,7 @@ export class AuthController {
   @Get('me')
   @UseGuards(JwtAuthGuard)
   async me(@CurrentUser() user: JwtPayload) {
-    return { user: await this.auth.getMe(user.sub) };
+    return { user: await this.users.getMe(user.sub) };
   }
 
   /** Google 인증 페이지로 302 리디렉트 (가드가 처리, 핸들러 바디는 비움). */
@@ -87,7 +92,7 @@ export class AuthController {
       return;
     }
 
-    const outcome = await this.auth.handleGoogleLogin(user);
+    const outcome = await this.oauth.handleGoogleLogin(user);
 
     if (outcome.kind === 'authenticated') {
       const { accessToken, refreshToken } = outcome.result;
@@ -105,6 +110,6 @@ export class AuthController {
   @Post('link')
   @HttpCode(HttpStatus.OK)
   link(@Body() dto: LinkDto) {
-    return this.auth.link(dto);
+    return this.oauth.link(dto);
   }
 }

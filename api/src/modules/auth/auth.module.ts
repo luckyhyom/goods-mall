@@ -2,7 +2,9 @@ import { Module } from '@nestjs/common';
 import { JwtModule } from '@nestjs/jwt';
 import { PassportModule } from '@nestjs/passport';
 import { TokenService } from './token.service';
-import { AuthService } from './auth.service';
+import { LocalAuthService } from './services/local-auth.service';
+import { OAuthLinkService } from './services/oauth-link.service';
+import { UserService } from './services/user.service';
 import { AuthController } from './auth.controller';
 import { GoogleStrategy } from './strategies/google.strategy';
 import { GoogleCallbackGuard } from './guards/google-callback.guard';
@@ -19,7 +21,9 @@ import { AdminGuard } from './guards/admin.guard';
   controllers: [AuthController],
   providers: [
     TokenService,
-    AuthService,
+    LocalAuthService,
+    OAuthLinkService,
+    UserService,
     GoogleStrategy,
     GoogleCallbackGuard,
     JwtAuthGuard,
