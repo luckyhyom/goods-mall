@@ -67,7 +67,7 @@ describe('AuthService', () => {
         role: 'USER',
         createdAt: baseUser.createdAt,
       });
-      expect(result.user as Record<string, unknown>).not.toHaveProperty(
+      expect(result.user as unknown as Record<string, unknown>).not.toHaveProperty(
         'passwordHash',
       );
     });
