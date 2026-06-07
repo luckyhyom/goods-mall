@@ -1,24 +1,19 @@
 import { TokenService } from './token.service';
-import type { AuthResult, PublicUser, UserRow } from './auth.types';
+import type { UserRow } from './auth.types';
+import { AuthResultResponse } from './dto/auth-result.response';
 
-/** DB 행에서 응답용 PublicUser만 추출(passwordHash 등 민감 필드 제거). */
-export const toPublicUser = (u: UserRow): PublicUser => ({
-  id: u.id,
-  email: u.email,
-  name: u.name,
-  role: u.role,
-  createdAt: u.createdAt,
-});
-
-/** 사용자에 대해 토큰 쌍을 발급하고 응답용 AuthResult로 조립(로컬·OAuth 공용). */
+/**
+ * 사용자에 대해 토큰 쌍을 발급하고 응답 DTO로 조립(로컬·OAuth 공용).
+ * DTO 생성자는 순수 매핑이므로, 토큰 발급(IO)은 여기서 담당해 분리한다.
+ */
 export const issueAuthResult = async (
   tokens: TokenService,
   user: UserRow,
-): Promise<AuthResult> => {
+): Promise<AuthResultResponse> => {
   const pair = await tokens.issueTokenPair({
     id: user.id,
     email: user.email,
     role: user.role,
   });
-  return { user: toPublicUser(user), ...pair };
+  return new AuthResultResponse(user, pair);
 };

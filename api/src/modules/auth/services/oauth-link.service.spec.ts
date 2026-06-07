@@ -4,6 +4,8 @@ import * as bcrypt from 'bcrypt';
 import { OAuthLinkService } from './oauth-link.service';
 import { TokenService } from '../token.service';
 import { PrismaService } from '../../../prisma/prisma.service';
+import { AuthResultResponse } from '../dto/auth-result.response';
+import { PublicUserResponse } from '../dto/public-user.response';
 
 /**
  * Phase C — Google 콜백 4단계 분기 + 계정 연결.
@@ -69,6 +71,8 @@ describe('OAuthLinkService', () => {
       if (out.kind !== 'authenticated') throw new Error('unreachable');
       expect(out.result.accessToken).toBe('a.jwt');
       expect(out.result.user.email).toBe('g@user.com');
+      expect(out.result).toBeInstanceOf(AuthResultResponse);
+      expect(out.result.user).toBeInstanceOf(PublicUserResponse);
       // 이미 OAuthAccount가 있으므로 email 조회/신규가입 분기로 넘어가지 않음
       expect(prisma.user.findUnique).not.toHaveBeenCalled();
       expect(prisma.user.create).not.toHaveBeenCalled();
@@ -199,6 +203,7 @@ describe('OAuthLinkService', () => {
       });
 
       expect(result.accessToken).toBe('a.jwt');
+      expect(result).toBeInstanceOf(AuthResultResponse);
       expect(prisma.oAuthAccount.create).toHaveBeenCalledWith({
         data: {
           userId: 'u-local',

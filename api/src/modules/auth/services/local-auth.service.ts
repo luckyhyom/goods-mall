@@ -5,9 +5,9 @@ import { AppException } from '../../../common/errors/app.exception';
 import { isUniqueViolation } from '../../../common/prisma/is-unique-violation';
 import { TokenService } from '../token.service';
 import { issueAuthResult } from '../auth.mappers';
-import type { AuthResult } from '../auth.types';
-import { SignupDto } from '../dto/signup.dto';
-import { LoginDto } from '../dto/login.dto';
+import { AuthResultResponse } from '../dto/auth-result.response';
+import { SignupRequest } from '../dto/signup.request';
+import { LoginRequest } from '../dto/login.request';
 
 const BCRYPT_ROUNDS = 12;
 
@@ -19,7 +19,11 @@ export class LocalAuthService {
     private readonly tokens: TokenService,
   ) {}
 
-  async signup({ email, password, name }: SignupDto): Promise<AuthResult> {
+  async signup({
+    email,
+    password,
+    name,
+  }: SignupRequest): Promise<AuthResultResponse> {
     const existing = await this.prisma.user.findUnique({ where: { email } });
     if (existing) {
       throw new AppException('AUTH_EMAIL_TAKEN');
@@ -39,7 +43,7 @@ export class LocalAuthService {
     }
   }
 
-  async login({ email, password }: LoginDto): Promise<AuthResult> {
+  async login({ email, password }: LoginRequest): Promise<AuthResultResponse> {
     const user = await this.prisma.user.findUnique({ where: { email } });
     if (!user) {
       throw new AppException('AUTH_INVALID_CREDENTIALS');

@@ -6,18 +6,24 @@ import { AppException } from '../../../common/errors/app.exception';
 import { isUniqueViolation } from '../../../common/prisma/is-unique-violation';
 import { TokenService } from '../token.service';
 import { issueAuthResult } from '../auth.mappers';
-import type {
-  AuthResult,
-  GoogleAuthOutcome,
-  GoogleProfile,
-} from '../auth.types';
-import { LinkDto } from '../dto/link.dto';
+import type { GoogleProfile } from '../auth.types';
+import { AuthResultResponse } from '../dto/auth-result.response';
+import { LinkRequest } from '../dto/link.request';
 
 /** pending_link JWT payload */
 interface PendingLinkPayload {
   email: string;
   sub: string; // Google providerId
 }
+
+/**
+ * Google 콜백 결과. 컨트롤러는 `kind`만 보고 리다이렉트를 분기한다.
+ * - authenticated: 로그인 성공 → fragment redirect
+ * - pending: 기존 로컬 계정과 연결 필요 → `?pending=<jwt>` redirect
+ */
+export type GoogleAuthOutcome =
+  | { kind: 'authenticated'; result: AuthResultResponse }
+  | { kind: 'pending'; pendingToken: string };
 
 /** pending_link JWT 수명 (auth-strategy §5: 5분) */
 const PENDING_LINK_TTL: JwtSignOptions['expiresIn'] = '5m';
@@ -92,7 +98,7 @@ export class OAuthLinkService {
    * pending JWT 검증 → 기존 패스워드 확인 → OAuthAccount 생성 → 토큰 발급.
    * 어느 단계든 실패는 정보 노출을 피해 AUTH_LINK_INVALID(401)로 통일.
    */
-  async link({ pending, password }: LinkDto): Promise<AuthResult> {
+  async link({ pending, password }: LinkRequest): Promise<AuthResultResponse> {
     let payload: PendingLinkPayload;
     try {
       payload = await this.jwt.verifyAsync<PendingLinkPayload>(pending, {

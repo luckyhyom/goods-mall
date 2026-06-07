@@ -3,6 +3,8 @@ import * as bcrypt from 'bcrypt';
 import { LocalAuthService } from './local-auth.service';
 import { TokenService } from '../token.service';
 import { PrismaService } from '../../../prisma/prisma.service';
+import { AuthResultResponse } from '../dto/auth-result.response';
+import { PublicUserResponse } from '../dto/public-user.response';
 
 describe('LocalAuthService', () => {
   let service: LocalAuthService;
@@ -65,6 +67,9 @@ describe('LocalAuthService', () => {
       expect(
         result.user as unknown as Record<string, unknown>,
       ).not.toHaveProperty('passwordHash');
+      // 응답은 평범한 객체가 아니라 응답 DTO 클래스 인스턴스여야 한다
+      expect(result).toBeInstanceOf(AuthResultResponse);
+      expect(result.user).toBeInstanceOf(PublicUserResponse);
     });
 
     it('이미 존재하는 이메일 → AUTH_EMAIL_TAKEN', async () => {
@@ -96,6 +101,7 @@ describe('LocalAuthService', () => {
 
       expect(result.accessToken).toBe('access');
       expect(result.user.email).toBe('a@b.com');
+      expect(result).toBeInstanceOf(AuthResultResponse);
     });
 
     it('없는 유저 → AUTH_INVALID_CREDENTIALS', async () => {

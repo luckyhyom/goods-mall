@@ -16,10 +16,10 @@ import { OAuthLinkService } from './services/oauth-link.service';
 import { UserService } from './services/user.service';
 import { TokenService } from './token.service';
 import type { GoogleProfile } from './auth.types';
-import { SignupDto } from './dto/signup.dto';
-import { LoginDto } from './dto/login.dto';
-import { RefreshDto } from './dto/refresh.dto';
-import { LinkDto } from './dto/link.dto';
+import { SignupRequest } from './dto/signup.request';
+import { LoginRequest } from './dto/login.request';
+import { RefreshRequest } from './dto/refresh.request';
+import { LinkRequest } from './dto/link.request';
 import { JwtAuthGuard, type JwtPayload } from './guards/jwt-auth.guard';
 import {
   GoogleCallbackGuard,
@@ -38,25 +38,25 @@ export class AuthController {
   ) {}
 
   @Post('signup')
-  signup(@Body() dto: SignupDto) {
+  signup(@Body() dto: SignupRequest) {
     return this.localAuth.signup(dto); // 201 (POST 기본)
   }
 
   @Post('login')
   @HttpCode(HttpStatus.OK)
-  login(@Body() dto: LoginDto) {
+  login(@Body() dto: LoginRequest) {
     return this.localAuth.login(dto);
   }
 
   @Post('refresh')
   @HttpCode(HttpStatus.OK)
-  refresh(@Body() dto: RefreshDto) {
+  refresh(@Body() dto: RefreshRequest) {
     return this.tokens.rotate(dto.refreshToken);
   }
 
   @Post('logout')
   @HttpCode(HttpStatus.NO_CONTENT)
-  async logout(@Body() dto: RefreshDto): Promise<void> {
+  async logout(@Body() dto: RefreshRequest): Promise<void> {
     await this.tokens.revoke(dto.refreshToken);
   }
 
@@ -109,7 +109,7 @@ export class AuthController {
   /** LOCAL 계정에 OAuth 연결 — pending JWT + 기존 패스워드 확인. */
   @Post('link')
   @HttpCode(HttpStatus.OK)
-  link(@Body() dto: LinkDto) {
+  link(@Body() dto: LinkRequest) {
     return this.oauth.link(dto);
   }
 }

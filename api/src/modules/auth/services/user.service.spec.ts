@@ -1,6 +1,7 @@
 import { Test } from '@nestjs/testing';
 import { UserService } from './user.service';
 import { PrismaService } from '../../../prisma/prisma.service';
+import { PublicUserResponse } from '../dto/public-user.response';
 
 describe('UserService', () => {
   let service: UserService;
@@ -37,6 +38,7 @@ describe('UserService', () => {
       expect(user as unknown as Record<string, unknown>).not.toHaveProperty(
         'passwordHash',
       );
+      expect(user).toBeInstanceOf(PublicUserResponse);
     });
 
     it('토큰은 유효하나 계정이 사라진 경우 → UNAUTHORIZED', async () => {
