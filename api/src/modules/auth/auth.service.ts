@@ -130,15 +130,7 @@ export class AuthService {
    * 3) 없고 email User가 있으면 연결 필요 → pending_link JWT 발급
    */
   async handleGoogleLogin(profile: GoogleProfile): Promise<GoogleAuthOutcome> {
-    const account = await this.prisma.oAuthAccount.findUnique({
-      where: {
-        provider_providerId: {
-          provider: 'GOOGLE',
-          providerId: profile.providerId,
-        },
-      },
-      include: { user: true },
-    });
+    const account = await this.findGoogleAccount(profile.providerId);
     if (account) {
       return {
         kind: 'authenticated',
@@ -173,15 +165,7 @@ export class AuthService {
       }
       // 조회와 생성 사이의 경쟁(동시 OAuth 로그인 또는 로컬 signup) → 분기 재평가:
       // 같은 OAuthAccount가 이미 생겼으면 그 User로 로그인, 아니면(email만 선점) 연결 필요.
-      const raced = await this.prisma.oAuthAccount.findUnique({
-        where: {
-          provider_providerId: {
-            provider: 'GOOGLE',
-            providerId: profile.providerId,
-          },
-        },
-        include: { user: true },
-      });
+      const raced = await this.findGoogleAccount(profile.providerId);
       if (raced) {
         return {
           kind: 'authenticated',
@@ -190,6 +174,14 @@ export class AuthService {
       }
       return this.pendingLink(profile);
     }
+  }
+
+  /** provider+sub로 연결된 Google OAuthAccount를 소유 User와 함께 조회. */
+  private findGoogleAccount(providerId: string) {
+    return this.prisma.oAuthAccount.findUnique({
+      where: { provider_providerId: { provider: 'GOOGLE', providerId } },
+      include: { user: true },
+    });
   }
 
   /** 연결 필요 분기: 기존 계정과 묶기 위한 pending_link JWT 발급. */
