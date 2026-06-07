@@ -65,10 +65,7 @@ export class TokenService {
 
     // 재사용 감지(도난 의심): 이미 revoke된 토큰 제시 → 패밀리 전체 무효화
     if (record.revokedAt) {
-      await this.prisma.refreshToken.updateMany({
-        where: { userId: record.userId, revokedAt: null },
-        data: { revokedAt: new Date() },
-      });
+      await this.revokeFamily(record.userId);
       throw new AppException('AUTH_REFRESH_REUSED');
     }
 
@@ -83,10 +80,7 @@ export class TokenService {
       data: { revokedAt: new Date() },
     });
     if (claimed.count === 0) {
-      await this.prisma.refreshToken.updateMany({
-        where: { userId: record.userId, revokedAt: null },
-        data: { revokedAt: new Date() },
-      });
+      await this.revokeFamily(record.userId);
       throw new AppException('AUTH_REFRESH_REUSED');
     }
 
@@ -105,6 +99,14 @@ export class TokenService {
     if (!record) return;
     await this.prisma.refreshToken.update({
       where: { id: record.id },
+      data: { revokedAt: new Date() },
+    });
+  }
+
+  /** 도난 의심 시 해당 유저의 살아있는 refresh 토큰을 일괄 무효화(패밀리 무효화). */
+  private async revokeFamily(userId: string): Promise<void> {
+    await this.prisma.refreshToken.updateMany({
+      where: { userId, revokedAt: null },
       data: { revokedAt: new Date() },
     });
   }
