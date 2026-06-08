@@ -1,4 +1,4 @@
-## 코딩 규칙 (요약 — 본문은 링크 참조)
+## 코딩 규칙 (요약)
 
 - Request DTO = `dto/*.request.ts`/`XxxRequest`(class-validator). Response DTO = `dto/*.response.ts`/`XxxResponse`(**생성자 화이트리스트** 매핑).
 
